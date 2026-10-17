@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Lower third</title>
+<link rel="stylesheet" href="common.css">
+<style>
+  /* Bar at the bottom of a camera picture; everything else stays transparent. */
+  .bar { position: absolute; left: 64px; right: 64px; bottom: 56px; height: 150px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 30px;
+    background: var(--plate); border-radius: 16px; padding: 0 30px 0 22px; border-left: 10px solid var(--side); backdrop-filter: blur(8px); }
+  .bar .card { font-size: 92px; min-width: 1.35em; height: 1.2em; padding: 0 0.12em; }
+  .bar .title { font-family: var(--display); font-variation-settings: "wght" 600, "wdth" 85; font-size: 50px; line-height: 1.05; min-width: 0; }
+  .bar .title .bi { display: flex; } .bar .title .s { font-size: 0.5em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar .meta { font-size: 24px; color: var(--muted); margin-top: 6px; }
+  .bar .meta .bi { flex-direction: row; gap: 0.8em; } .bar .meta .s { font-size: 1em; margin: 0; }
+  .now { text-align: right; }
+  .now .lbl { font-size: 20px; color: var(--muted); }
+  .now .dn { font-family: var(--display); font-variation-settings: "wght" 700, "wdth" 80; font-size: 64px; text-transform: uppercase; letter-spacing: 0.03em; line-height: 1; }
+  .now .dn .s { font-size: 0.34em; letter-spacing: 0.08em; }
+  .bar.enter { animation-name: rise; }
+  @keyframes rise { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="common.js"></script>
+<script>
+const { h, bi, L, live, keyed, applySide, slotKey, debug } = DP;
+const root = document.getElementById('root');
+live((state) => {
+  const slot = state.slots?.[slotKey];
+  applySide(document.body, slot);
+  const comp = slot?.competition, r = comp?.round, d = r?.dances?.[r.currentDance];
+  keyed(root, JSON.stringify([slot?.color, comp?.number, comp?.title, r?.name, r?.currentDance]), () => {
+    if (!comp) return debug ? [h('div', { class: 'empty-hint' }, `Slot ${slotKey} has no competition`)] : [];
+    return [h('div', { class: 'bar enter' },
+      h('div', { class: 'card' }, comp.number),
+      h('div', { class: 'title' }, bi(L.title(comp)), r ? h('div', { class: 'meta' }, bi(L.round(r))) : null),
+      d ? h('div', { class: 'now' }, h('div', { class: 'lbl caps' }, bi(L.t('now'), 'inline')), h('div', { class: 'dn' }, bi(L.dance(d)))) : h('div'))];
+  });
+});
+</script>
+</body>
+</html>

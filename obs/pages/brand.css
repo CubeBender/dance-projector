@@ -1,0 +1,13 @@
+/* Shared look of the branding pages; colours come from config.js via brand.js. */
+:root {
+  --primary: #E8B931; --secondary: #1E7BFF; --ground: #0A0D16;
+  --text: #F3F5F9; --muted: #9AA3B5; --plate: rgba(9, 11, 18, 0.72);
+  --display: "Bahnschrift", "DIN Alternate", "Arial Narrow", sans-serif;
+  --body: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+}
+html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: transparent; color: var(--text); font-family: var(--body); }
+.caps { font-family: var(--display); font-variation-settings: "wght" 400, "wdth" 85; text-transform: uppercase; letter-spacing: 0.16em; }
+.display { font-family: var(--display); font-variation-settings: "wght" 700, "wdth" 82; }
+.second { opacity: 0.7; font-size: 0.5em; display: block; margin-top: 0.25em; font-variation-settings: "wght" 400, "wdth" 85; }
+.placeholder-tag { position: absolute; right: 24px; bottom: 18px; font: 600 14px var(--body); letter-spacing: 0.1em; color: rgba(255,255,255,0.35); text-transform: uppercase; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; } }

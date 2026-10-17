@@ -49,8 +49,26 @@ function slotView(key, model, raw, store) {
   };
 }
 
+// Every competition of the event, for the schedule page (ordered by check-in end like the DanS Organizace page).
+function scheduleView(model, store) {
+  if (!model) return [];
+  const onScreen = new Map(Object.entries(store.cfg.slots).filter(([k]) => store.cfg.split || k === 'A').map(([k, s]) => [s.competitionId, k]));
+  return model.competitions
+    .map((c) => {
+      const d = c.round?.dances?.[c.round.currentDance];
+      return {
+        number: c.number, title: c.title, titleEn: c.titleEn, checkInEnd: c.checkInEnd, state: c.state, running: c.running,
+        slot: onScreen.get(c.id) || null,
+        round: c.round ? { name: c.round.name, state: c.round.state } : null,
+        dance: c.running && d ? { name: d.name, nameCs: d.nameCs, nameEn: d.nameEn } : null,
+      };
+    })
+    .sort((a, b) => (a.checkInEnd || 0) - (b.checkInEnd || 0) || a.number - b.number);
+}
+
 function outputState(model, raw, store, status) {
   return {
+    schedule: scheduleView(model, store),
     updated: Date.now(),
     connected: !!status?.connected,
     event: model?.event ? { name: model.event.name, location: model.event.location, date: model.event.date } : null,

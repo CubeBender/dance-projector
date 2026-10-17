@@ -23,7 +23,7 @@ class OutputServer {
     this.state = { slots: {} };
     this.json = JSON.stringify(this.state);
     this.server = http.createServer((req, res) => this.handle(req, res));
-    setInterval(() => { for (const c of this.clients) c.write(': keepalive\n\n'); }, 15000).unref();
+    this.server.keepAliveTimeout = 5000; // idle keep-alive sockets are released quickly
   }
 
   listen(port, host) {
@@ -40,8 +40,8 @@ class OutputServer {
     if (json === this.lastCompare) return; // skip identical updates so pages don't re-render
     this.lastCompare = json;
     this.state = state;
-    this.json = JSON.stringify(state);
-    for (const c of this.clients) c.write(`data: ${this.json}\n\n`);
+    this.version = (this.version || 0) + 1;
+    this.json = JSON.stringify({ ...state, version: this.version });
   }
 
   serveFile(res, file) {
@@ -58,14 +58,15 @@ class OutputServer {
     const p = url.pathname;
     if (req.method !== 'GET') { res.writeHead(405).end(); return; }
     if (p === '/' ) { res.writeHead(302, { location: '/out/' }).end(); return; }
-    if (p === '/api/state') { res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-cache' }).end(this.json); return; }
-    if (p === '/events') {
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
-      res.write(`retry: 2000\ndata: ${this.json}\n\n`);
-      this.clients.add(res);
-      req.on('close', () => this.clients.delete(res));
-      return;
+    // Pages poll this (?since=<version>); 204 = nothing changed. Polling instead of a held-open stream matters:
+    // all OBS browser sources share one browser with a limit of 6 connections per host, and open streams
+    // used up that limit so photos and other requests never loaded.
+    if (p === '/api/state') {
+      if (Number(url.searchParams.get('since')) === (this.version || 0) && this.version) { res.writeHead(204, { 'cache-control': 'no-store' }).end(); return; }
+      res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(this.json); return;
     }
+    // No held-open streams on purpose (OBS shares 6 connections per host across all browser sources).
+    if (p === '/events') { res.writeHead(410, { 'cache-control': 'no-store' }).end('gone: poll /api/state'); return; }
     if (p.startsWith('/photos/')) return this.serveFile(res, safeJoin(this.photoDir, p.slice(8)));
     if (p === '/out' || p === '/out/') return this.serveFile(res, path.join(this.outputsDir, 'index.html'));
     if (p.startsWith('/out/')) return this.serveFile(res, safeJoin(this.outputsDir, p.slice(5)));

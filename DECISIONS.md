@@ -81,6 +81,30 @@ Claude's decision log. Questions that need the user are asked in the conversatio
 - **Context:** the user pushed the repository to public GitHub (2026-10-17) and asked that personal and private data is not sent in the future.
 - **Decision:** real DanS snapshots live in ignored `app/fixtures/private/`; tests and fixture mode use `app/fixtures/sample.json`, made by `npm run anonymize` (fake names, clubs, federation IDs; heats, numbers, letters and allocation unchanged). OBS backups are local only. A pre-commit hook in `.githooks/` blocks private files, e-mails, personal Windows paths, PINs and secrets.
 
+### D-11 Rewrite public git history
+- **Asked (2026-10-17):** the public GitHub history still contained the real fixture and OBS backup; rewrite + force push, push cleanup only, or leave it?
+- **Answer:** rewrite history and force push. Done 2026-10-17; old file URLs return 404. GitHub may still serve old commits by their exact ID until purged (support request or re-creating the repository).
+
+### D-12 OBS with placeholders
+- **Context (2026-10-17):** the user has no logo, brand colours or sponsor materials yet, only last year's setup.
+- **Decision (user):** proceed with placeholders.
+
+### C-13 Output pages poll instead of holding a stream open
+- **Decision:** pages fetch `/api/state?since=<version>` every second; 204 when unchanged; the SSE endpoint is gone (410).
+- **Why:** OBS browser sources share one browser limited to 6 connections per host; open streams blocked photos and data. Found and verified in OBS on 2026-10-17. (Changes C-02's companion choice of SSE for page updates; DanS polling is unchanged.)
+
+### C-14 OBS collection design
+- **Decision:** new collection "Dance Projector 2026", numbered scene names (01–99) for Touch Portal, a shared nested "~ Background" scene under all graphics, default fade 600 ms, plus Move and Dip to black; branding in `obs/pages/config.js`; the pause script loaded with the collection.
+- **Why:** consistent look and transitions without blinking backgrounds; one place to swap branding; last year's collection untouched.
+
+### C-15 Placeholder visuals
+- **Decision:** dark hall background with two drifting floor-light pools in the brand colours; logo placeholder drawn as a back-number card with the event initials; sponsor carousel on white cards; break screen with a big clock card. Default accent gold `#E8B931`, second colour blue `#1E7BFF`.
+- **Why:** continues the back-number card motif of the data pages so the whole show reads as one design until real branding replaces the colours and logo.
+
+### C-16 Judge photos re-encoded on import
+- **Decision:** photos are re-encoded as baseline JPEG, max 900 px wide; originals kept in `photos-original/`.
+- **Why:** smaller, uniform files for OBS. (Added while investigating a missing photo whose real cause was C-13.)
+
 ## Changes
 
 - **2026-10-17 – how this file is used.** Before: open questions were listed here as "Pending" for the user to go through. After: questions are asked in the conversation and only recorded here. **Reason:** the user clarified the file is for Claude to keep track. Former P-03 became D-06 (verified); P-06, P-08 and P-10 were asked and became D-07–D-09 and C-07; P-01, P-02, P-04, P-05, P-07, P-09 became Claude's decisions C-01–C-06.

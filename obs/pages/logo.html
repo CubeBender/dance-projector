@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Logo</title>
+<link rel="stylesheet" href="brand.css">
+<style>
+  /* Logo and event name, transparent so the background scene shows through. Replays its entrance each time the scene goes live. */
+  .wrap { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 46px; }
+  .logo { animation: logo-in 1.2s cubic-bezier(.2,.8,.2,1) both, breathe 9s ease-in-out 1.2s infinite; }
+  .name { font-size: 76px; text-align: center; line-height: 1.05; animation: up 900ms cubic-bezier(.2,.8,.2,1) 350ms both; }
+  .meta { font-size: 28px; color: var(--muted); animation: up 900ms cubic-bezier(.2,.8,.2,1) 550ms both; }
+  .rule { width: 160px; height: 6px; border-radius: 3px; background: var(--primary); animation: grow 900ms cubic-bezier(.2,.8,.2,1) 450ms both; }
+  @keyframes logo-in { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: none; } }
+  @keyframes breathe { 50% { transform: scale(1.025); } }
+  @keyframes up { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+  @keyframes grow { from { transform: scaleX(0); } to { transform: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo" id="logo"></div>
+  <div class="rule"></div>
+  <div class="name display" id="name"></div>
+  <div class="meta caps" id="meta"></div>
+</div>
+<div class="placeholder-tag" id="tag">Placeholder</div>
+<script src="config.js"></script><script src="brand.js"></script>
+<script>
+  const { S, bi, logoHtml } = BRAND;
+  document.getElementById('logo').innerHTML = logoHtml(420);
+  document.getElementById('name').innerHTML = bi({ cs: S.event.name, en: S.event.nameEn });
+  document.getElementById('meta').textContent = [S.event.place, S.event.date].filter(Boolean).join('  ·  ');
+  document.getElementById('tag').hidden = !!S.logo;
+</script>
+</body>
+</html>

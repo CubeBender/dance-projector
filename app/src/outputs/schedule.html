@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Schedule</title>
+<link rel="stylesheet" href="common.css">
+<style>
+  body { --side: var(--accent, #E8B931); }
+  .top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 26px; }
+  .top .h { font-family: var(--display); font-variation-settings: "wght" 700, "wdth" 82; font-size: 64px; }
+  .top .ev { color: var(--muted); font-size: 26px; text-align: right; max-width: 55%; }
+  .page { font-size: 24px; color: var(--muted); }
+  .list { display: grid; gap: 12px; }
+  .item { display: grid; grid-template-columns: 150px 120px 1fr 330px; align-items: center; gap: 26px; height: 84px; padding: 0 26px;
+    background: var(--plate); border-radius: 12px; border-left: 8px solid transparent; }
+  .item .time { font-family: var(--display); font-variation-settings: "wght" 600, "wdth" 85; font-size: 40px; font-variant-numeric: tabular-nums; }
+  .item .time small { display: block; font-size: 15px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; font-variation-settings: "wght" 400, "wdth" 85; }
+  .item .card { font-size: 46px; width: 2.2em; height: 1.3em; }
+  .item .t { font-family: var(--display); font-variation-settings: "wght" 600, "wdth" 85; font-size: 38px; line-height: 1.05; min-width: 0; }
+  .item .t .bi { display: flex; }
+  .item .t .s { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item .st { justify-self: end; text-align: right; font-size: 26px; color: var(--muted); }
+  .item.running { border-left-color: var(--item, var(--side)); background: color-mix(in srgb, var(--item, var(--side)) 22%, rgba(9,11,18,0.85)); }
+  .item.running .st { color: #fff; }
+  .live { display: inline-flex; align-items: center; gap: 12px; }
+  .live::before { content: ""; width: 14px; height: 14px; border-radius: 50%; background: var(--item, var(--side)); box-shadow: 0 0 0 6px color-mix(in srgb, var(--item, var(--side)) 35%, transparent); animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 11px transparent; } }
+  @media (prefers-reduced-motion: reduce) { .live::before { animation: none; } }
+  .item.done { opacity: 0.45; }
+</style>
+</head>
+<body>
+<div class="stage" id="stage"></div>
+<script src="common.js"></script>
+<script>
+const { h, bi, L, live, keyed, debug, q } = DP;
+const stage = document.getElementById('stage');
+const PER_PAGE = Number(q.get('rows') || 9), PAGE_MS = Number(q.get('page') || 12000);
+const DONE = new Set(['Completed', 'Closed', 'Cancelled', 'Finished']);
+const TXT = {
+  cs: { title: 'Harmonogram', checkin: 'Prezence do', running: 'Probíhá', done: 'Odtančeno', next: 'Následuje', page: (a, b) => `Strana ${a}/${b}` },
+  en: { title: 'Schedule', checkin: 'Check-in until', running: 'Now dancing', done: 'Finished', next: 'Up next', page: (a, b) => `Page ${a}/${b}` },
+};
+const t = (k, ...a) => (lang) => { const v = (TXT[lang] || TXT.cs)[k]; return typeof v === 'function' ? v(...a) : v; };
+const time = (ms) => ms ? new Date(ms).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' }) : '–';
+let state = null, page = 0;
+
+function rows(s) {
+  // Running competitions first, then the upcoming ones in check-in order; finished ones drop off.
+  const all = s.schedule || [];
+  return [...all.filter((c) => c.running), ...all.filter((c) => !c.running && !DONE.has(c.state))];
+}
+
+function render() {
+  if (!state) return;
+  const list = rows(state);
+  const pages = Math.max(1, Math.ceil(list.length / PER_PAGE));
+  if (page >= pages) page = 0;
+  const shown = list.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
+  const colors = { A: state.slots?.A?.color, B: state.slots?.B?.color };
+  document.body.style.setProperty('--accent', state.slots?.A?.color || '#E8B931');
+  const key = JSON.stringify([page, pages, state.event?.name, shown]);
+  keyed(stage, key, () => {
+    if (!list.length) return debug ? [h('div', { class: 'empty-hint' }, 'No competitions loaded')] : [];
+    let i = 0;
+    return [
+      h('div', { class: 'top enter' },
+        h('div', { class: 'h' }, bi(t('title'))),
+        h('div', { class: 'ev' }, state.event?.name || '', pages > 1 ? h('div', { class: 'page' }, bi(t('page', page + 1, pages), 'inline')) : null)),
+      h('div', { class: 'list' }, shown.map((c) => {
+        const status = c.running
+          ? h('span', { class: 'live' }, c.dance ? bi(L.dance(c.dance)) : bi(t('running')))
+          : DONE.has(c.state) ? bi(t('done')) : c.round ? bi(L.round(c.round)) : null;
+        return h('div', { class: 'item enter' + (c.running ? ' running' : '') + (DONE.has(c.state) ? ' done' : ''), '--i': i++, '--item': c.slot ? colors[c.slot] : null },
+          h('div', { class: 'time' }, h('small', null, bi(t('checkin'))), time(c.checkInEnd)),
+          h('div', { class: 'card' }, c.number),
+          h('div', { class: 't' }, bi(L.title(c))),
+          h('div', { class: 'st' }, status));
+      })),
+    ];
+  });
+}
+live((s) => { state = s; render(); });
+setInterval(() => { page++; render(); }, PAGE_MS);
+</script>
+</body>
+</html>

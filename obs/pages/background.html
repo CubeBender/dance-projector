@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Background</title>
+<link rel="stylesheet" href="brand.css">
+<style>
+  /* Dark hall with two slowly drifting pools of floor light in the brand colours. Sits under every graphics scene. */
+  html, body { background: var(--ground) !important; }
+  /* soft edges come from the gradients themselves; CSS blur filters render badly in OBS */
+  .pool { position: absolute; width: 1700px; height: 1700px; border-radius: 50%; opacity: 0.38; will-change: transform; }
+  .p1 { background: radial-gradient(circle, var(--primary) 0%, color-mix(in srgb, var(--primary) 35%, transparent) 25%, transparent 62%); left: -380px; top: -620px; animation: drift1 38s ease-in-out infinite alternate; }
+  .p2 { background: radial-gradient(circle, var(--secondary) 0%, color-mix(in srgb, var(--secondary) 35%, transparent) 25%, transparent 62%); right: -520px; bottom: -760px; opacity: 0.34; animation: drift2 46s ease-in-out infinite alternate; }
+  .floor { position: absolute; left: -10%; right: -10%; bottom: -30%; height: 70%; transform: perspective(900px) rotateX(62deg);
+    background: repeating-linear-gradient(90deg, rgba(255,255,255,0.035) 0 2px, transparent 2px 160px), repeating-linear-gradient(0deg, rgba(255,255,255,0.025) 0 2px, transparent 2px 160px);
+    mask-image: linear-gradient(to top, rgba(0,0,0,0.9), transparent 80%); }
+  .vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 40%, transparent 40%, rgba(0,0,0,0.65) 100%); }
+  @keyframes drift1 { to { transform: translate(520px, 260px) scale(1.12); } }
+  @keyframes drift2 { to { transform: translate(-560px, -220px) scale(0.92); } }
+</style>
+</head>
+<body>
+<div class="pool p1"></div><div class="pool p2"></div><div class="floor"></div><div class="vignette"></div>
+<script src="config.js"></script><script src="brand.js"></script>
+</body>
+</html>

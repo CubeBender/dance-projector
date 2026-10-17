@@ -21,6 +21,16 @@ srv.listen(0, '127.0.0.1').then(({ port }) => {
   Promise.all([get(v.photo), get('/photos/..%2F..%2Fconfig.json'), get('/out/heats.html'), get('/api/state')]).then(([a, b, c, d]) => {
     assert.strictEqual(a, 200); assert.notStrictEqual(b, 200, 'path traversal blocked'); assert.strictEqual(c, 200); assert.strictEqual(d, 200);
     s.removePhoto('90000001'); assert.ok(!s.judge('90000001').photo);
+  }).then(async () => {
+    // update protocol: short polls, 204 when unchanged, no held-open stream
+    srv.publish({ slots: {}, n: 1 });
+    const v1 = srv.version;
+    assert.strictEqual(await get(`/api/state?since=${v1}`), 204);
+    srv.publish({ slots: {}, n: 1 }); // identical content does not bump the version
+    assert.strictEqual(srv.version, v1);
+    srv.publish({ slots: {}, n: 2 });
+    assert.strictEqual(await get(`/api/state?since=${v1}`), 200);
+    assert.strictEqual(await get('/events'), 410);
     console.log('OK'); srv.close(); process.exit(0);
-  });
+  }).catch((e) => { console.error(e); process.exit(1); });
 });

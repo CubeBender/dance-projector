@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Sponsors</title>
+<link rel="stylesheet" href="brand.css">
+<style>
+  /* Sponsor carousel: one partner at a time on a white card, crossfading. Transparent around it. */
+  .cap { position: absolute; top: 90px; left: 0; right: 0; text-align: center; font-size: 30px; color: var(--muted); }
+  .stage { position: absolute; left: 50%; top: 54%; width: 1280px; height: 640px; transform: translate(-50%, -50%); }
+  .slide { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: #fff; border-radius: 28px;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.45); opacity: 0; transform: scale(0.97); transition: opacity 900ms ease, transform 1200ms cubic-bezier(.2,.8,.2,1); overflow: hidden; }
+  .slide::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 16px; background: var(--primary); }
+  .slide.on { opacity: 1; transform: none; }
+  .slide img { max-width: 82%; max-height: 74%; object-fit: contain; }
+  .ph { color: #0B0D12; text-align: center; }
+  .ph .n { font-size: 110px; }
+  .ph .l { margin-top: 18px; font-size: 26px; color: #6b7385; }
+  .dots { position: absolute; left: 0; right: 0; bottom: 70px; display: flex; justify-content: center; gap: 14px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: rgba(255,255,255,0.25); transition: background 400ms; }
+  .dot.on { background: var(--primary); }
+</style>
+</head>
+<body>
+<div class="cap caps" id="cap"></div>
+<div class="stage" id="stage"></div>
+<div class="dots" id="dots"></div>
+<script src="config.js"></script><script src="brand.js"></script>
+<script>
+  const { S, bi } = BRAND;
+  document.getElementById('cap').innerHTML = bi({ cs: 'Partneři soutěže', en: 'Partners' });
+  const list = S.sponsors?.length ? S.sponsors : [{ name: 'Partner', image: null, seconds: 6 }];
+  const stage = document.getElementById('stage'), dots = document.getElementById('dots');
+  const slides = list.map((s) => {
+    const el = document.createElement('div');
+    el.className = 'slide';
+    el.innerHTML = s.image ? `<img src="${s.image}" alt="">` : `<div class="ph"><div class="n display">${s.name}</div><div class="l caps">logo partnera · placeholder</div></div>`;
+    stage.append(el);
+    const d = document.createElement('div'); d.className = 'dot'; dots.append(d);
+    return { el, d, ms: (s.seconds || 6) * 1000 };
+  });
+  let i = -1;
+  function next() {
+    if (i >= 0) { slides[i].el.classList.remove('on'); slides[i].d.classList.remove('on'); }
+    i = (i + 1) % slides.length;
+    slides[i].el.classList.add('on'); slides[i].d.classList.add('on');
+    setTimeout(next, slides[i].ms);
+  }
+  next();
+</script>
+</body>
+</html>

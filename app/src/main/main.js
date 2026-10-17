@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, nativeImage } = require('electron');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -22,6 +22,36 @@ let outputAddr = null;
 function lanAddresses() {
   return Object.values(os.networkInterfaces()).flat()
     .filter((i) => i && i.family === 'IPv4' && !i.internal).map((i) => i.address);
+}
+
+// Re-encode a photo as a plain baseline JPEG, max 900 px wide. Some JPEGs (seen with a progressive phone photo)
+// display in Chrome but not in the OBS browser source; a fresh encode always works and keeps files small.
+function normalizePhoto(src, dest) {
+  let img = nativeImage.createFromPath(src);
+  if (img.isEmpty()) throw new Error('Not a supported image');
+  const { width } = img.getSize();
+  if (width > 900) img = img.resize({ width: 900, quality: 'best' });
+  fs.writeFileSync(dest, img.toJPEG(90));
+}
+
+function importJudgePhoto(fedId, file) {
+  const tmp = path.join(app.getPath('temp'), `dp-photo-${Date.now()}.jpg`);
+  normalizePhoto(file, tmp);
+  try { store.importPhoto(fedId, tmp); } finally { fs.rm(tmp, { force: true }, () => {}); }
+}
+
+// One-time conversion of photos imported before normalisation existed.
+function normalizeExistingPhotos() {
+  for (const [fedId, j] of Object.entries(store.judges.data)) {
+    if (!j.photo || j.normalized) continue;
+    const file = path.join(store.photoDir, j.photo);
+    const keep = path.join(store.dir, 'photos-original');
+    try {
+      fs.mkdirSync(keep, { recursive: true });
+      if (!fs.existsSync(path.join(keep, j.photo))) fs.copyFileSync(file, path.join(keep, j.photo));
+      normalizePhoto(file, file + '.tmp'); fs.renameSync(file + '.tmp', file); store.updateJudge(fedId, { normalized: true }); }
+    catch (e) { console.error('photo', fedId, e.message); }
+  }
 }
 
 function wantedRounds() {
@@ -86,6 +116,9 @@ function rendererState() {
         { name: 'Judges – slot A', path: '/out/judges.html?slot=A' },
         { name: 'Judges – slot B', path: '/out/judges.html?slot=B' },
         { name: 'Floor overview (split or whole floor)', path: '/out/split.html' },
+        { name: 'Schedule', path: '/out/schedule.html' },
+        { name: 'Lower third for camera – slot A', path: '/out/lowerthird.html?slot=A' },
+        { name: 'Lower third for camera – slot B', path: '/out/lowerthird.html?slot=B' },
       ],
     } : null,
   };
@@ -164,7 +197,9 @@ function setupIpc() {
       if (r.canceled || !r.filePaths[0]) return rendererState();
       file = r.filePaths[0];
     }
-    store.importPhoto(fedId, file); rebuild(); return rendererState();
+    try { importJudgePhoto(fedId, file); store.updateJudge(fedId, { normalized: true }); }
+    catch (e) { dialog.showErrorBox('Judge photo', `This file could not be used as a photo: ${e.message}`); }
+    rebuild(); return rendererState();
   });
   ipcMain.handle('judge-crop', (_e, fedId, crop) => { store.updateJudge(fedId, { crop: crop ? cleanCrop(crop) : null }); rebuild(); return rendererState(); });
   ipcMain.handle('judge-photo-remove', (_e, fedId) => { store.removePhoto(fedId); rebuild(); return rendererState(); });
@@ -173,6 +208,7 @@ function setupIpc() {
 
 async function start() {
   store = new Store(app.getPath('userData'));
+  normalizeExistingPhotos();
   server = new OutputServer({ outputsDir: path.join(__dirname, '..', 'outputs'), photoDir: store.photoDir });
   try {
     outputAddr = await server.listen(store.cfg.outputPort, store.cfg.outputHost);

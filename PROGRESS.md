@@ -18,11 +18,18 @@
 
 - 2026-10-17 Public GitHub repo (CubeBender/dance-projector). Removed personal data from the tree: real fixture replaced by anonymised `sample.json`, OBS backup untracked, real judge removed from tests. Added ignore rules and a pre-commit hook (`.githooks/`, enabled with `git config core.hooksPath .githooks`).
 
+- 2026-10-17 Git history rewritten and force-pushed without personal data (user's decision D-11). Pre-commit hook fixed (it let one commit through when its output was cut off).
+- 2026-10-17 **OBS show built with placeholders**: collection "Dance Projector 2026" (14 scenes), shared background, fade/Move/Dip-to-black transitions, pause-media-off-air script (tested: pauses off air, resumes from the same frame). New app pages: schedule, lower third. Branding placeholders in `obs/pages/`. Every scene checked as rendered by OBS.
+- 2026-10-17 Fixed: output pages in OBS stopped loading photos/data because of the 6-connections-per-host browser limit (pages now poll). Fixed: OBS default stylesheet and blur broke the background.
+
 ## In progress
-- Nothing running.
+- Nothing running. The app is left running on the user's data; OBS is on the new collection with "99 Black" on program.
 
 ## Next
-- OBS show: scenes with the output pages, transitions, pause-on-hide script, Touch Portal buttons. Needs logos, videos, judge photos, brand colours.
+- User: look at the new collection in OBS; set up the Touch Portal page (Docs/obs-show/TOUCH_PORTAL.md).
+- User: real materials (logo, colours, sponsor logos/videos) → obs/assets + obs/pages/config.js.
+- Optional: ask GitHub support to purge cached old commits, or re-create the repository.
+- Rehearsal with camera and a live DanS round.
 
 ## Blockers
-- None for the app. OBS visuals wait for assets.
+- None. Final OBS visuals wait for the real branding materials; placeholders are in place.

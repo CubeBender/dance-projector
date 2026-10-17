@@ -58,15 +58,19 @@
     return h('span', { class: 'bi ' + cls }, h('span', { class: 'p' }, a), b && b !== a ? h('span', { class: 's' }, b) : null);
   }
 
-  // Calls render(state) on every change; keeps the last good state if the app restarts.
-  function live(render) {
-    let last = null;
+  // Calls render(state) on every change; keeps the last good state if the app is briefly unreachable.
+  // Polls once a second with short requests (no held-open connection; see server.js for why).
+  function live(render, everyMs = Number(q.get('poll') || 1000)) {
+    let last = null, version = 0;
     const go = (s) => { last = s; setLanguage(s); try { render(s); } catch (e) { console.error(e); } };
-    function connect() {
-      const es = new EventSource('/events');
-      es.onmessage = (m) => { try { go(JSON.parse(m.data)); } catch (e) { console.error(e); } };
+    async function poll() {
+      try {
+        const r = await fetch(`/api/state?since=${version}`, { cache: 'no-store' });
+        if (r.status === 200) { const s = await r.json(); version = s.version || 0; go(s); }
+      } catch { /* app restarting: keep showing the last state */ }
+      setTimeout(poll, everyMs);
     }
-    fetch('/api/state').then((r) => r.json()).then(go).catch(() => {}).finally(connect);
+    poll();
     return () => last;
   }
 

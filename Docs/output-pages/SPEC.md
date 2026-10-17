@@ -1,6 +1,8 @@
 # Output pages – specification
 
-Served by the control app at `http://<host>:8787`. Built for 1920×1080 OBS browser sources with a transparent background. Pages receive live state over server-sent events from `/events` and never need a reload.
+Served by the control app at `http://<host>:8787`. Built for 1920×1080 OBS browser sources with a transparent background. Pages poll `/api/state?since=<version>` once a second (204 = unchanged) and never need a reload. No long-lived connections: OBS allows only 6 per host across all browser sources (decision C-13).
+
+Also: `/out/schedule.html` (running competitions first, then upcoming by check-in time; pages through every 12 s; `rows=`, `page=` options) and `/out/lowerthird.html?slot=A` (bar for the camera scene).
 
 | URL | Shows |
 |---|---|

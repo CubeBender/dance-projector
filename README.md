@@ -3,7 +3,8 @@
 Projection for dancesport competitions in OBS, with live data from DanS (dancesport.services).
 
 - `app/` – Electron operator app and the OBS output pages (heats, judges, floor overview). See [app/README.md](app/README.md).
-- `tools/` – helper scripts (read-only DanS client, OBS websocket client, DevTools recorder).
+- `obs/` – the OBS show: branding pages, pause-media script, how to use and rebuild. See [obs/README.md](obs/README.md).
+- `tools/` – helper scripts (`build_obs_show.py` builds the OBS scene collection) (read-only DanS client, OBS websocket client, DevTools recorder).
 - `Docs/` – one folder per task with its spec and plan. Overview in [SPEC.md](SPEC.md), [PLAN.md](PLAN.md), [PROGRESS.md](PROGRESS.md), decisions in [DECISIONS.md](DECISIONS.md).
 - [DANS_KNOWLEDGEBASE.md](DANS_KNOWLEDGEBASE.md) – what we know about the DanS API.
 
