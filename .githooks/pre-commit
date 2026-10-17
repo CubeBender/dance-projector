@@ -3,6 +3,10 @@
 #   git config core.hooksPath .githooks
 # Bypass only if you are sure: git commit --no-verify
 
+# Messages go to stderr, and a closed output pipe must never stop the hook from blocking.
+exec 1>&2
+trap '' PIPE
+
 fail=0
 staged=$(git diff --cached --name-only --diff-filter=ACMR)
 [ -z "$staged" ] && exit 0
