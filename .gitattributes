@@ -1,1 +1,5 @@
 * text=auto
+
+# shell scripts must keep LF or they fail to run
+.githooks/* text eol=lf
+*.sh text eol=lf
