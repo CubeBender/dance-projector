@@ -1,0 +1,4 @@
+* text=auto
+
+# OBS backup must stay byte-identical to what OBS wrote
+obs/backup-2025/** -text

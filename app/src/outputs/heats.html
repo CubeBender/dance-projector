@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Heats</title>
+<link rel="stylesheet" href="common.css">
+<style>
+  .heats { flex: 1; display: grid; gap: 28px; margin-top: 30px; min-height: 0; align-content: start; }
+  .heat { background: var(--plate); border-radius: 14px; padding: 18px 22px 22px; min-width: 0; display: flex; flex-direction: column; }
+  .heat-label { color: var(--muted); font-size: 24px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: baseline; }
+  .heat-label .p { color: var(--text); }
+  /* list modes: number card + name (+ club) */
+  .rows { display: grid; grid-auto-flow: column; column-gap: 26px; row-gap: var(--gap); }
+  .row { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 0.45em; height: var(--row); font-size: var(--row); min-width: 0; }
+  .row .card { font-size: calc(var(--row) * 0.7); width: 2.05em; height: 1.32em; }
+  .who { min-width: 0; line-height: 1.15; }
+  .name { font-size: calc(var(--row) * 0.42); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .club { display: none; font-size: calc(var(--row) * 0.25); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 0.1em; }
+  .mode-full.with-club .club { display: block; }
+  .mode-names .name { font-size: calc(var(--row) * 0.5); }
+  /* numbers-only mode: a board of back-number cards */
+  .board { display: flex; flex-wrap: wrap; gap: var(--gap); align-content: flex-start; }
+  .board .card { font-size: calc(var(--ch) * 0.8); width: calc(var(--ch) * 1.5); height: var(--ch); }
+</style>
+</head>
+<body>
+<div class="stage" id="stage"></div>
+<script src="common.js"></script>
+<script>
+const { h, bi, L, live, keyed, header, applySide, slotKey, debug, q } = DP;
+const stage = document.getElementById('stage');
+
+function layout(heats, mode) {
+  const n = heats.length;
+  const max = Math.max(...heats.map((x) => x.competitors.length));
+  let sub = 1;
+  if (mode !== 'numbers') while (n * (sub + 1) <= 4 && max / sub > 8) sub++;
+  const perRow = Math.min(n, Math.max(1, Math.floor(4 / sub)));
+  return { n, max, perRow, sub, heatRows: Math.ceil(n / perRow), rowsPerCol: Math.ceil(max / sub), mode };
+}
+
+// After the header is in place, measure the real space left and size everything to fill it.
+function fit(L) {
+  const grid = stage.querySelector('.heats');
+  if (!grid) return;
+  const top = grid.getBoundingClientRect().top;
+  const label = 62; // heat label + plate padding
+  const availH = (1080 - 56 - top - (L.heatRows - 1) * 28) / L.heatRows - label;
+  if (L.mode === 'numbers') {
+    const panel = grid.querySelector('.heat');
+    const W = panel.clientWidth - 44, gap = 18;
+    let best = 0;
+    for (let c = 1; c <= L.max; c++) {
+      const rows = Math.ceil(L.max / c);
+      const hc = Math.min((W - (c - 1) * gap) / c / 1.5, (availH - (rows - 1) * gap) / rows);
+      best = Math.max(best, hc);
+    }
+    const ch = Math.floor(Math.min(best, 260));
+    grid.querySelectorAll('.board').forEach((b) => { b.style.setProperty('--ch', ch + 'px'); b.style.setProperty('--gap', gap + 'px'); });
+    return;
+  }
+  const row = Math.max(40, Math.min(110, Math.floor(availH / (L.rowsPerCol * 1.16))));
+  grid.querySelectorAll('.rows').forEach((r) => { r.style.setProperty('--row', row + 'px'); r.style.setProperty('--gap', Math.round(row * 0.16) + 'px'); });
+  grid.classList.toggle('with-club', row >= 54);
+}
+
+function render(state) {
+  const mode = ['full', 'names', 'numbers'].includes(q.get('show')) ? q.get('show') : (state.heatsShow || 'full');
+  const slot = state.slots?.[slotKey];
+  applySide(document.body, slot);
+  const comp = slot?.competition;
+  const r = comp?.round;
+  const dance = r?.dances?.[r.currentDance];
+  const heats = dance?.heats || [];
+  const key = JSON.stringify([mode, slot?.label, slot?.labelEn, slot?.color, comp?.number, comp?.title, r?.name, r?.currentDance, r?.dances?.map((d) => d.completed), heats]);
+  let lay = null;
+  const changed = keyed(stage, key, () => {
+    if (!comp || !heats.length) return debug ? [h('div', { class: 'empty-hint' }, comp ? 'Round has no heats yet' : `Slot ${slotKey} has no competition`)] : [];
+    lay = layout(heats, mode);
+    let i = 3;
+    const label = (ht) => heats.length > 1 ? L.t('heat', ht.heat) : L.t(r.advances ? 'all' : 'final');
+    const body = (ht) => mode === 'numbers'
+      ? h('div', { class: 'board' }, ht.competitors.map((c) => h('div', { class: 'card enter', '--i': i++ }, c.number ?? '–')))
+      : h('div', { class: 'rows', '--row': '60px', '--gap': '10px', style: { gridTemplateRows: `repeat(${Math.ceil(ht.competitors.length / lay.sub) || 1}, auto)` } },
+          ht.competitors.map((c) => h('div', { class: 'row enter', '--i': i++ },
+            h('div', { class: 'card' }, c.number ?? '–'),
+            h('div', { class: 'who' }, h('div', { class: 'name' }, c.name), mode === 'full' && c.club ? h('div', { class: 'club' }, c.club) : null))));
+    const grid = h('div', { class: `heats mode-${mode}`, style: { gridTemplateColumns: `repeat(${lay.perRow}, minmax(0, 1fr))` } },
+      heats.map((ht) => h('section', { class: 'heat enter', '--i': i++ },
+        h('div', { class: 'heat-label caps' }, bi(label(ht), 'inline'), h('span', null, `${ht.competitors.length}`)),
+        body(ht))));
+    return [...header(slot, comp), grid];
+  });
+  if (changed && lay) fit(lay);
+}
+live(render);
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+# dependencies and build output
+node_modules/
+dist/
+out/
+
+# Python
+__pycache__/
+*.pyc
+
+# local tool settings
+.claude/settings.local.json
+
+# OS / editor
+Thumbs.db
+.DS_Store
+*.tmp

@@ -1,0 +1,17 @@
+{
+  "name": "dance-projector",
+  "version": "0.1.0",
+  "description": "Operator app and OBS output pages for dancesport competitions, fed read-only from DanS",
+  "main": "src/main/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "fixture": "electron . --fixture=fixtures/pardubice.json",
+    "snapshot": "node scripts/snapshot.js",
+    "test": "node scripts/test-model.js && node scripts/test-store.js",
+    "preview": "node scripts/preview-server.js"
+  },
+  "devDependencies": {
+    "electron": "^44.8.0"
+  }
+}

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' http://localhost:* http://127.0.0.1:* data:; style-src 'self' 'unsafe-inline'">
+<title>Dance Projector</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="bar">
+  <div class="brand">Dance Projector</div>
+  <form id="server-form" class="server">
+    <label for="server">DanS server</label>
+    <input id="server" spellcheck="false" placeholder="http://192.168.1.80">
+    <button type="submit">Connect</button>
+  </form>
+  <label class="event"><span>Event</span><select id="event"></select></label>
+  <button id="refresh-events" class="ghost" title="Reload the list of events">Reload events</button>
+  <div class="status" id="status"><span class="dot"></span><span id="status-text">Not connected</span></div>
+</header>
+
+<nav class="tabs">
+  <button class="tab active" data-tab="competitions">Competitions</button>
+  <button class="tab" data-tab="judges">Judges</button>
+</nav>
+
+<main>
+  <section id="tab-competitions" class="pane">
+    <div class="tools">
+      <div class="chips" id="filter">
+        <button data-f="all" class="chip active">All</button>
+        <button data-f="running" class="chip">Running</button>
+        <button data-f="open" class="chip">Not finished</button>
+      </div>
+      <input id="search" placeholder="Find number or name" spellcheck="false">
+    </div>
+    <div class="table-wrap"><table class="comps">
+      <thead><tr><th class="slotcol">Show on</th><th>#</th><th>Competition</th><th>Check-in end</th><th>Round</th><th>Dances</th><th class="num">Checked in</th><th class="num">Judges</th></tr></thead>
+      <tbody id="comps"></tbody>
+    </table></div>
+    <p class="empty" id="comps-empty" hidden></p>
+  </section>
+
+  <section id="tab-judges" class="pane" hidden>
+    <div class="tools">
+      <div class="chips" id="jfilter">
+        <button data-f="all" class="chip active">All judges</button>
+        <button data-f="slots" class="chip">On screen now</button>
+      </div>
+      <p class="hint">Photos and names are saved per judge and reused at every event. Drop an image on a photo to replace it.</p>
+    </div>
+    <div class="judges" id="judges"></div>
+    <p class="empty" id="judges-empty" hidden>Choose an event to load its judges.</p>
+  </section>
+
+  <aside class="side">
+    <h2>Floor</h2>
+    <label class="switch"><input type="checkbox" id="split"> <span>Floor is split in two halves</span></label>
+    <div class="whole" id="whole">
+      <label class="row">Accent colour <input type="color" id="whole-color" title="Accent colour for the whole floor"></label>
+    </div>
+    <div id="slots"></div>
+
+    <h2>Output pages for OBS</h2>
+    <p class="hint">Add each as a Browser source, 1920 × 1080.</p>
+    <select id="host"></select>
+    <ul class="outputs" id="outputs"></ul>
+
+    <h2>On-screen text</h2>
+    <label class="stack">Main language
+      <select id="lang-primary"><option value="cs">Čeština</option><option value="en">English</option></select>
+    </label>
+    <label class="stack">Second language, shown smaller underneath
+      <select id="lang-secondary"><option value="en">English</option><option value="cs">Čeština</option><option value="none">None</option></select>
+    </label>
+    <label class="stack">Heats page shows
+      <select id="heats-show">
+        <option value="full">Number, name and club</option>
+        <option value="names">Number and name</option>
+        <option value="numbers">Numbers only</option>
+      </select>
+    </label>
+
+    <h2>Settings</h2>
+    <label class="stack">Round states that count as running
+      <input id="running-states" spellcheck="false">
+      <small>DanS round state while judging is enabled. Default: InProgress</small>
+    </label>
+  </aside>
+</main>
+
+<template id="slot-tpl">
+  <div class="slot">
+    <div class="slot-head"><span class="slot-key"></span>
+      <div class="slot-names"><input class="slot-label" maxlength="40" title="Side name in Czech"><input class="slot-label-en" maxlength="40" title="Side name in English"></div>
+      <input type="color" class="slot-color" title="Floor lighting colour"></div>
+    <div class="slot-comp"></div>
+    <label class="row small"><input type="checkbox" class="slot-follow"> Follow running competitions automatically</label>
+  </div>
+</template>
+
+<dialog id="crop">
+  <form method="dialog" class="crop-box">
+    <h3 id="crop-title">Adjust photo</h3>
+    <p class="hint">Drag to move. Scroll or use the slider to zoom. The frame matches the judge card.</p>
+    <div class="crop-frame" id="crop-frame"><img id="crop-img" alt=""><div class="crop-letter" id="crop-letter"></div></div>
+    <label class="row">Zoom <input type="range" id="crop-zoom" min="1" max="4" step="0.01"></label>
+    <div class="crop-actions">
+      <button type="button" id="crop-reset">Reset</button>
+      <span class="spacer"></span>
+      <button value="cancel">Cancel</button>
+      <button value="save" class="primary" id="crop-save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Split</title>
+<link rel="stylesheet" href="common.css">
+<style>
+  .halves { position: absolute; inset: 56px 64px; display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+  .halves.single { grid-template-columns: 1fr; }
+  .half { position: relative; border-radius: 18px; overflow: hidden; display: flex; flex-direction: column; padding: 48px 52px; box-sizing: border-box; min-width: 0;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--side) 78%, #000) 0%, color-mix(in srgb, var(--side) 28%, #07080c) 62%, rgba(7,8,12,0.92) 100%);
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--side) 70%, #fff 0%), 0 0 80px color-mix(in srgb, var(--side) 35%, transparent); }
+  /* floor lighting: a soft beam from the top edge */
+  .half::after { content: ""; position: absolute; inset: -20% 10% auto; height: 60%; background: radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.22), transparent 70%); pointer-events: none; }
+  .half.off { background: rgba(9,11,18,0.55); box-shadow: inset 0 0 0 2px rgba(255,255,255,0.08); }
+  .half.off .side { color: var(--muted); }
+  .side { font-size: 34px; color: #fff; min-height: 1.2em; }
+  .num { margin-top: 44px; }
+  .num .card { font-size: 230px; min-width: 1.3em; height: 1.18em; padding: 0 0.1em; }
+  .num .card::before { height: 0.06em; }
+  .t { margin-top: 40px; font-family: var(--display); font-variation-settings: "wght" 700, "wdth" 82; font-size: 68px; line-height: 1.04; }
+  .r { margin-top: 18px; font-size: 34px; color: rgba(255,255,255,0.82); }
+  .bottom { margin-top: auto; display: flex; align-items: flex-end; gap: 26px; }
+  .bottom .lbl { font-size: 24px; color: rgba(255,255,255,0.7); padding-bottom: 0.6em; }
+  .bottom .dn { font-family: var(--display); font-variation-settings: "wght" 700, "wdth" 80; font-size: 76px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .idle { margin-top: auto; margin-bottom: auto; font-size: 34px; color: var(--muted); }
+  /* whole floor: one wide panel, number left, text right */
+  .single .half { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto 1fr auto; column-gap: 64px; }
+  .single .side { grid-column: 1 / -1; }
+  .single .num { grid-row: 2 / 4; align-self: center; margin-top: 0; }
+  .single .num .card { font-size: 340px; }
+  .single .info { grid-column: 2; align-self: center; }
+  .single .bottom { grid-column: 2; }
+  .single .t { margin-top: 0; font-size: 92px; }
+</style>
+</head>
+<body>
+<div class="halves" id="halves"></div>
+<script src="common.js"></script>
+<script>
+const { h, bi, L, live, keyed, debug } = DP;
+const halves = document.getElementById('halves');
+
+function roundLine(r) {
+  return (lang) => [L.round(r)(lang), r.competes ? `${r.competes}${r.advances ? ' → ' + r.advances : ''}` : ''].filter(Boolean).join(' · ');
+}
+
+function half(slot, i) {
+  const comp = slot?.competition;
+  const el = h('section', { class: 'half enter' + (comp ? '' : ' off'), '--i': i, '--side': slot?.color || '#444' },
+    h('div', { class: 'side caps' }, slot && (slot.label || slot.labelEn) ? bi(L.side(slot)) : null));
+  if (!comp) { el.append(h('div', { class: 'idle' }, bi(L.t('none')))); return el; }
+  const r = comp.round;
+  const dance = r?.dances?.[r.currentDance];
+  el.append(
+    h('div', { class: 'num' }, h('div', { class: 'card' }, comp.number)),
+    h('div', { class: 'info' },
+      h('div', { class: 't' }, bi(L.title(comp))),
+      r ? h('div', { class: 'r' }, bi(roundLine(r))) : null),
+    dance ? h('div', { class: 'bottom' }, h('span', { class: 'lbl caps' }, bi(L.t('now'))), h('span', { class: 'dn' }, bi(L.dance(dance)))) : null);
+  return el;
+}
+
+function render(state) {
+  const A = state.slots?.A, B = state.slots?.B;
+  const split = state.split !== false;
+  const pick = (s) => s && [s.label, s.labelEn, s.color, s.competition?.number, s.competition?.title, s.competition?.round?.name, s.competition?.round?.currentDance];
+  keyed(halves, JSON.stringify([split, pick(A), pick(B)]), () => {
+    halves.classList.toggle('single', !split);
+    if (!A?.competition && !(split && B?.competition) && !debug) return [];
+    return split ? [half(A, 0), half(B, 1)] : [half(A, 0)];
+  });
+}
+live(render);
+</script>
+</body>
+</html>

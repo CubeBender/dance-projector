@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Judges</title>
+<link rel="stylesheet" href="common.css">
+<style>
+  .panel-title { margin: 34px 0 22px 6px; color: var(--muted); font-size: 26px; }
+  .judges { flex: 1; display: grid; gap: 26px; align-content: center; justify-content: center; min-height: 0; }
+  .judge { width: var(--w); background: var(--plate); border-radius: 14px; overflow: hidden; position: relative; display: flex; flex-direction: column; }
+  .photo { width: 100%; aspect-ratio: 3 / 4; background: #1b1f2a; position: relative; overflow: hidden; }
+  .panel-title { display: flex; align-items: baseline; }
+  .panel-title .count { margin-left: 0.7em; }
+  .photo.none { display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, color-mix(in srgb, var(--side) 55%, #1b1f2a), #141821); }
+  .initials { font-family: var(--display); font-variation-settings: "wght" 600, "wdth" 80; font-size: calc(var(--w) * 0.34); color: rgba(255,255,255,0.85); letter-spacing: 0.02em; }
+  .judge .card { position: absolute; left: calc(var(--w) * 0.06); top: calc(var(--w) * 0.06); font-size: calc(var(--w) * 0.26); width: 1.15em; height: 1.2em; }
+  .label { padding: calc(var(--w) * 0.06) calc(var(--w) * 0.07) calc(var(--w) * 0.075); }
+  .first { font-size: calc(var(--w) * 0.105); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .last { font-family: var(--display); font-variation-settings: "wght" 600, "wdth" 82; font-size: calc(var(--w) * 0.145); line-height: 1.05; margin-top: 0.1em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .country { font-size: calc(var(--w) * 0.075); color: var(--muted); margin-top: 0.3em; }
+</style>
+</head>
+<body>
+<div class="stage" id="stage"></div>
+<script src="common.js"></script>
+<script>
+const { h, bi, L, live, keyed, header, applySide, photo, slotKey, debug } = DP;
+const stage = document.getElementById('stage');
+
+// Split a display name into a small first line and a large last line.
+function split(name) {
+  const parts = String(name).trim().split(/\s+/);
+  if (parts.length < 2) return ['', name];
+  return [parts.slice(0, -1).join(' '), parts[parts.length - 1]];
+}
+function initials(j) { return ((j.firstName || '')[0] || '') + ((j.surname || '')[0] || ''); }
+
+// Pick columns and card width so every judge fits in the space under the header.
+function layout(n) {
+  const availW = 1920 - 128, availH = 1080 - 112 - 200 - 80;
+  let best = null;
+  for (let cols = 1; cols <= Math.min(n, 9); cols++) {
+    const rows = Math.ceil(n / cols);
+    const wByW = (availW - (cols - 1) * 26) / cols;
+    const wByH = ((availH - (rows - 1) * 26) / rows) / (4 / 3 + 0.62);
+    const w = Math.floor(Math.min(wByW, wByH, 330));
+    if (!best || w > best.w) best = { cols, w };
+  }
+  return best;
+}
+
+function render(state) {
+  const slot = state.slots?.[slotKey];
+  applySide(document.body, slot);
+  const comp = slot?.competition;
+  const judges = comp?.judges || [];
+  const key = JSON.stringify([slot?.label, slot?.labelEn, slot?.color, comp?.number, comp?.title, comp?.round?.name, judges]);
+  keyed(stage, key, () => {
+    if (!comp || !judges.length) return debug ? [h('div', { class: 'empty-hint' }, comp ? 'No judges assigned yet' : `Slot ${slotKey} has no competition`)] : [];
+    const lay = layout(judges.length);
+    return [
+      ...header(slot, comp, { showDances: false }),
+      h('div', { class: 'panel-title caps enter', '--i': 1 }, bi(L.t('judges'), 'inline'), h('span', { class: 'count' }, `· ${judges.length}`)),
+      h('div', { class: 'judges', style: { gridTemplateColumns: `repeat(${lay.cols}, var(--w))` }, '--w': lay.w + 'px' },
+        judges.map((j, i) => {
+          const [first, last] = split(j.name);
+          return h('article', { class: 'judge enter', '--i': i + 2 },
+            j.photo ? h('div', { class: 'photo' }, photo(j.photo, j.crop))
+                    : h('div', { class: 'photo none' }, h('span', { class: 'initials' }, initials(j))),
+            h('div', { class: 'card' }, j.letter),
+            h('div', { class: 'label' }, first ? h('div', { class: 'first' }, first) : null, h('div', { class: 'last' }, last),
+              j.country ? h('div', { class: 'country caps' }, j.country) : null));
+        })),
+    ];
+  });
+}
+live(render);
+</script>
+</body>
+</html>
