@@ -1,0 +1,37 @@
+#!/bin/sh
+# Blocks commits that would publish personal or private data. Enable once per clone:
+#   git config core.hooksPath .githooks
+# Bypass only if you are sure: git commit --no-verify
+
+fail=0
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -z "$staged" ] && exit 0
+
+# 1. Files that must never be committed
+bad_paths=$(printf '%s\n' "$staged" | grep -E '(^|/)(fixtures/private/|obs/backup-|obs/private/|photos/)|\.(db|db-wal|db-shm|sqlite|log|mp4|mov|avi|mkv|pem|key)$|(^|/)(judges|config)\.json$|(^|/)\.env' )
+if [ -n "$bad_paths" ]; then
+  echo "pre-commit: these files contain or may contain private data:"; printf '  %s\n' $bad_paths; fail=1
+fi
+fixtures=$(printf '%s\n' "$staged" | grep -E '^app/fixtures/.*\.json$' | grep -v '^app/fixtures/sample\.json$')
+if [ -n "$fixtures" ]; then
+  echo "pre-commit: only app/fixtures/sample.json (anonymised) may be committed:"; printf '  %s\n' $fixtures; fail=1
+fi
+
+# 2. Content checks on the added lines (package-lock is skipped: it contains maintainer e-mails)
+added=$(git diff --cached -U0 --diff-filter=ACMR -- . ':(exclude)app/package-lock.json' ':(exclude).githooks/pre-commit' | grep '^+' | grep -v '^+++')
+check() { # pattern, message
+  hit=$(printf '%s\n' "$added" | grep -E -i -m 3 "$1")
+  if [ -n "$hit" ]; then echo "pre-commit: $2"; printf '%s\n' "$hit" | cut -c1-140 | sed 's/^/  /'; fail=1; fi
+}
+check '[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z.]{2,}' 'e-mail address in staged changes'
+check '[A-Z]:[\\/]+Users[\\/]+[A-Za-z0-9._-]+' 'personal Windows path (C:\Users\<name>) in staged changes'
+check '"pin" *: *"[0-9]+' 'judge PIN in staged changes'
+check '(password|passwd|secret|token|stream_?key|api_?key)"? *[:=] *"[^"]{6,}' 'possible secret in staged changes'
+
+if [ "$fail" -ne 0 ]; then
+  echo
+  echo "Commit blocked to keep private data out of the public repository."
+  echo "Fix the files above (or unstage them). Real DanS snapshots: run 'npm run anonymize' and commit app/fixtures/sample.json."
+  exit 1
+fi
+exit 0

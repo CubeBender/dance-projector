@@ -9,7 +9,7 @@ const { fetchRaw } = require('../src/main/poller');
 (async () => {
   const server = process.argv[2] || 'http://localhost:8686';
   const which = process.argv[3] || 'CS1761';
-  const out = process.argv[4] || path.join(__dirname, '..', 'fixtures', 'pardubice.json');
+  const out = process.argv[4] || path.join(__dirname, '..', 'fixtures', 'private', 'snapshot.json');
   const dans = new DansClient(server);
   const events = await dans.events();
   const ev = events.find((e) => e.abbreviation === which || e.authorities?.[0]?.event_id === which);

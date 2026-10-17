@@ -8,7 +8,7 @@ Operator app plus OBS output pages. Reads DanS read-only.
 cd app
 npm install          # first time only
 npm start            # normal use, talks to DanS
-npm run fixture      # runs from the recorded Pardubice snapshot, no DanS needed
+npm run fixture      # runs from the anonymised sample event, no DanS needed
 npm test             # model, safety and storage tests
 ```
 
@@ -38,8 +38,13 @@ Add `&bg=1` (or `?bg=1`) to see a page with a dark background in a normal browse
 
 `%APPDATA%\dance-projector\`: `config.json` (server, event, slots, colours), `judges.json` (display names per federation ID), `photos\`.
 
-## Updating the snapshot
+## Updating the sample event
+
+Real snapshots contain personal data and stay in the ignored `fixtures/private/` folder. Only the anonymised sample is committed.
 
 ```
-npm run snapshot -- http://localhost:8686 CS1761 fixtures/pardubice.json
+npm run snapshot -- http://localhost:8686 CS1761 fixtures/private/pardubice.json
+npm run anonymize -- fixtures/private/pardubice.json fixtures/sample.json
 ```
+
+To run the app on a real snapshot locally: `npx electron . --fixture=fixtures/private/pardubice.json`.

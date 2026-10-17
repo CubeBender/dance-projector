@@ -206,6 +206,8 @@ Main event tables: `competition`, `competition_competitor`, `competitor`, `compe
 
 | Tool | Purpose |
 |---|---|
+| `app/scripts/snapshot.js` | Records a full read of an event into `app/fixtures/private/` (personal data, not committed) |
+| `app/scripts/anonymize-fixture.js` | Makes the shareable `app/fixtures/sample.json` from a snapshot |
 | `tools/dans_read.py` | GET-only client: schedule, judge allocation, heats |
 | `tools/cdp_sniff.py` | Loads a DanS page in headless Edge, logs all requests, blocks "deliver" URLs |
 | `tools/obsws.py` | obs-websocket client |

@@ -9,7 +9,7 @@ const { Store } = require('../src/main/store');
 const { OutputServer } = require('../src/main/server');
 const { outputState } = require('../src/main/view');
 
-const fixture = process.argv[2] || path.join(__dirname, '..', 'fixtures', 'pardubice.json');
+const fixture = process.argv[2] || path.join(__dirname, '..', 'fixtures', 'sample.json');
 const a = Number(process.argv[3] || 3), b = Number(process.argv[4] || 1), port = Number(process.argv[5] || 8788);
 const raw = JSON.parse(fs.readFileSync(fixture, 'utf8'));
 const store = new Store(fs.mkdtempSync(path.join(os.tmpdir(), 'dp-preview-')));

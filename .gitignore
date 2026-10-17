@@ -1,13 +1,49 @@
-# dependencies and build output
+# ---------------------------------------------------------------------------
+# Personal and private data: never commit (the repository is public).
+# The pre-commit hook in .githooks/ enforces this; see README "Private data".
+# ---------------------------------------------------------------------------
+
+# Real DanS snapshots: competitor and judge names, clubs, federation IDs.
+# Commit only the anonymised app/fixtures/sample.json (npm run anonymize).
+app/fixtures/private/
+app/fixtures/*.json
+!app/fixtures/sample.json
+
+# OBS configuration backups: local paths, device IDs, file names of private media
+obs/backup-*/
+obs/private/
+
+# App data if ever copied into the project: judge photos, display names, settings
+**/photos/
+judges.json
+config.json
+
+# Media assets (logos, sponsor videos, judge photos) - kept outside git
+assets/
+*.mp4
+*.mov
+*.avi
+*.mkv
+
+# Databases, logs, dumps, secrets
+*.db
+*.db-wal
+*.db-shm
+*.log
+*.sqlite
+.env
+.env.*
+*.pem
+*.key
+
+# ---------------------------------------------------------------------------
+# Build output and tooling
+# ---------------------------------------------------------------------------
 node_modules/
 dist/
 out/
-
-# Python
 __pycache__/
 *.pyc
-
-# local tool settings
 .claude/settings.local.json
 
 # OS / editor

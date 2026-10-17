@@ -77,6 +77,10 @@ Claude's decision log. Questions that need the user are asked in the conversatio
 ### C-11 Photo crop
 - **Decision:** crop stored as focus point (x, y in %) and zoom (1–4) per judge. Editor: drag to move, scroll or slider to zoom, inside a frame with the judge card's 3:4 shape. A new photo resets the crop.
 
+### C-12 Keep personal data out of the public repository
+- **Context:** the user pushed the repository to public GitHub (2026-10-17) and asked that personal and private data is not sent in the future.
+- **Decision:** real DanS snapshots live in ignored `app/fixtures/private/`; tests and fixture mode use `app/fixtures/sample.json`, made by `npm run anonymize` (fake names, clubs, federation IDs; heats, numbers, letters and allocation unchanged). OBS backups are local only. A pre-commit hook in `.githooks/` blocks private files, e-mails, personal Windows paths, PINs and secrets.
+
 ## Changes
 
 - **2026-10-17 – how this file is used.** Before: open questions were listed here as "Pending" for the user to go through. After: questions are asked in the conversation and only recorded here. **Reason:** the user clarified the file is for Claude to keep track. Former P-03 became D-06 (verified); P-06, P-08 and P-10 were asked and became D-07–D-09 and C-07; P-01, P-02, P-04, P-05, P-07, P-09 became Claude's decisions C-01–C-06.

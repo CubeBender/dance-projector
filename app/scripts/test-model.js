@@ -1,11 +1,12 @@
 'use strict';
-// Checks the model against the Pardubice scouting fixture (values verified by hand on 2026-10-17).
+// Checks the model against the anonymised sample (made from the Pardubice scouting event; heats, judge letters
+// and allocation are unchanged from the real data, which was verified by hand on 2026-10-17).
 const assert = require('assert');
 const path = require('path');
 const { buildModel, buildHeats } = require('../src/main/model');
 const { assertAllowed } = require('../src/main/dans');
 
-const raw = require(path.join(__dirname, '..', 'fixtures', 'pardubice.json'));
+const raw = require(path.join(__dirname, '..', 'fixtures', 'sample.json'));
 const m = buildModel(raw, { runningStates: ['InProgress'] });
 
 // allow-list
