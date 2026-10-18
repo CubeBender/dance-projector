@@ -5,6 +5,7 @@ const path = require('path');
 
 const DEFAULT_CONFIG = {
   server: 'http://localhost:8686',
+  servers: [],           // saved DanS servers: [{ name, url }]
   eventId: null,
   pollMs: 2000,
   runningStates: ['InProgress'],
@@ -48,6 +49,14 @@ function merge(base, extra) {
   return base;
 }
 
+// "192.168.1.80:8686/" -> "http://192.168.1.80:8686"
+function normalizeServer(url) {
+  url = String(url || '').trim().replace(/\/+$/, '');
+  if (url && !/^https?:\/\//i.test(url)) url = 'http://' + url;
+  return url;
+}
+function hostOf(url) { try { return new URL(url).host; } catch { return url; } }
+
 class Store {
   constructor(dir) {
     this.dir = dir;
@@ -60,6 +69,25 @@ class Store {
 
   get cfg() { return this.config.data; }
   updateConfig(patch) { merge(this.config.data, patch); this.config.save(); return this.cfg; }
+
+  // Saved servers. oldUrl identifies the entry being edited, so it can change its address.
+  saveServer({ name, url }, oldUrl) {
+    url = normalizeServer(url);
+    if (!url) throw new Error('server address is empty');
+    name = String(name || '').trim() || hostOf(url);
+    const list = this.cfg.servers || [];
+    const keys = new Set([url, oldUrl && normalizeServer(oldUrl)]);
+    const at = list.findIndex((s) => keys.has(s.url));
+    const rest = list.filter((s) => !keys.has(s.url));
+    rest.splice(at < 0 ? rest.length : Math.min(at, rest.length), 0, { name, url });
+    this.cfg.servers = rest; this.config.save();
+    return rest;
+  }
+  removeServer(url) {
+    url = normalizeServer(url);
+    this.cfg.servers = (this.cfg.servers || []).filter((s) => s.url !== url); this.config.save();
+    return this.cfg.servers;
+  }
 
   judge(fedId) { return this.judges.data[fedId] || {}; }
   updateJudge(fedId, patch) {
@@ -90,4 +118,4 @@ class Store {
   flush() { this.config.flush(); this.judges.flush(); }
 }
 
-module.exports = { Store, DEFAULT_CONFIG };
+module.exports = { Store, DEFAULT_CONFIG, normalizeServer };

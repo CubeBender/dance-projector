@@ -11,8 +11,10 @@
   <div class="brand">Dance Projector</div>
   <form id="server-form" class="server">
     <label for="server">DanS server</label>
+    <select id="server-pick" title="Saved servers"></select>
     <input id="server" spellcheck="false" placeholder="http://192.168.1.80">
     <button type="submit">Connect</button>
+    <button type="button" id="server-save" class="ghost">Save…</button>
   </form>
   <label class="event"><span>Event</span><select id="event"></select></label>
   <button id="refresh-events" class="ghost" title="Reload the list of events">Reload events</button>
@@ -110,6 +112,20 @@
       <span class="spacer"></span>
       <button value="cancel">Cancel</button>
       <button value="save" class="primary" id="crop-save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="server-dlg">
+  <form method="dialog" class="dlg-box">
+    <h3 id="server-dlg-title">Save server</h3>
+    <label class="stack"><small>Name</small><input id="server-name" maxlength="40" placeholder="Hall – scrutineers' PC"></label>
+    <label class="stack"><small>Address</small><input id="server-url" spellcheck="false" required placeholder="http://192.168.1.80:8686"></label>
+    <div class="crop-actions">
+      <button type="button" id="server-delete" class="danger">Delete</button>
+      <span class="spacer"></span>
+      <button value="cancel" formnovalidate>Cancel</button>
+      <button value="save" class="primary">Save</button>
     </div>
   </form>
 </dialog>

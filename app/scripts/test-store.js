@@ -15,6 +15,16 @@ s.flush();
 const v = judgeView({ fedId: '90000001', letter: 'C', name: 'Adam', surname: 'Testovací', country: 'CZE' }, s);
 assert.strictEqual(v.name, 'Ing. Adam Testovací'); assert.strictEqual(v.country, ''); assert.ok(v.photo.endsWith(name));
 const s2 = new Store(dir); assert.strictEqual(s2.judge('90000001').photo, name, 'persisted');
+// saved servers: normalised address, default name, rename and readdress in place, delete
+s.saveServer({ name: 'Hall', url: '192.168.1.80:8686/' });
+s.saveServer({ name: '', url: 'http://localhost:8686' });
+assert.deepStrictEqual(s.cfg.servers, [{ name: 'Hall', url: 'http://192.168.1.80:8686' }, { name: 'localhost:8686', url: 'http://localhost:8686' }]);
+s.saveServer({ name: 'Hall 2', url: 'http://192.168.1.81:8686' }, 'http://192.168.1.80:8686');
+assert.deepStrictEqual(s.cfg.servers.map((x) => x.name), ['Hall 2', 'localhost:8686'], 'edited entry keeps its place');
+s.saveServer({ name: 'Local', url: 'http://localhost:8686/' });
+assert.strictEqual(s.cfg.servers.length, 2, 'same address is not saved twice');
+s.removeServer('http://192.168.1.81:8686'); s.flush();
+assert.deepStrictEqual(new Store(dir).cfg.servers, [{ name: 'Local', url: 'http://localhost:8686' }], 'servers persisted');
 const srv = new OutputServer({ outputsDir: path.join(__dirname, '..', 'src', 'outputs'), photoDir: s.photoDir });
 srv.listen(0, '127.0.0.1').then(({ port }) => {
   const get = (p) => new Promise((r) => http.get(`http://127.0.0.1:${port}${p}`, (res) => { res.resume(); r(res.statusCode); }));

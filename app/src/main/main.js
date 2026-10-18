@@ -6,7 +6,7 @@ const path = require('path');
 const { DansClient } = require('./dans');
 const { Poller, FixturePoller, eventIdOf } = require('./poller');
 const { buildModel } = require('./model');
-const { Store } = require('./store');
+const { Store, normalizeServer } = require('./store');
 const { OutputServer } = require('./server');
 const { outputState, judgeView, cleanCrop } = require('./view');
 
@@ -156,7 +156,15 @@ async function connect() {
 
 function setupIpc() {
   ipcMain.handle('state', () => rendererState());
-  ipcMain.handle('set-server', async (_e, url) => { store.updateConfig({ server: url }); await connect(); return rendererState(); });
+  ipcMain.handle('set-server', async (_e, url) => { store.updateConfig({ server: normalizeServer(url) }); await connect(); return rendererState(); });
+  ipcMain.handle('save-server', (_e, entry, oldUrl) => {
+    const editingCurrent = oldUrl && normalizeServer(oldUrl) === store.cfg.server;
+    store.saveServer(entry, oldUrl);
+    const url = normalizeServer(entry.url);
+    if (editingCurrent && url !== store.cfg.server) { store.updateConfig({ server: url }); connect(); } // publishes when done
+    return rendererState();
+  });
+  ipcMain.handle('remove-server', (_e, url) => { store.removeServer(url); return rendererState(); });
   ipcMain.handle('refresh-events', async () => { await loadEvents(); publish(); return rendererState(); });
   ipcMain.handle('set-event', (_e, id) => {
     store.updateConfig({ eventId: id, slots: { A: { competitionId: null }, B: { competitionId: null } } });

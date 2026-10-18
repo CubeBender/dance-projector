@@ -35,8 +35,24 @@ function renderStatus() {
   if (S.fixture && !badge) el.prepend(h('span', { class: 'badge', id: 'fixture-badge' }, 'Snapshot'));
 }
 
+// same rule as the main process: add http://, drop trailing slashes
+const normServer = (u) => { u = String(u || '').trim().replace(/\/+$/, ''); return u && !/^https?:\/\//i.test(u) ? 'http://' + u : u; };
+const savedServer = (url) => (S.config.servers || []).find((s) => s.url === normServer(url)) || null;
+
+function renderServers() {
+  const list = S.config.servers || [];
+  const cur = savedServer(S.config.server);
+  const pick = $('#server-pick');
+  pick.hidden = !list.length;
+  pick.replaceChildren(...(cur ? [] : [h('option', { value: '' }, 'Other address')]),
+    ...list.map((s) => h('option', { value: s.url, selected: s === cur, title: s.url }, s.name)));
+  $('#server-save').textContent = savedServer($('#server').value) ? 'Edit…' : 'Save…';
+}
+
+let shownServer = null; // keep a typed, not yet connected address until the server really changes
 function renderBar() {
-  if (document.activeElement !== $('#server')) $('#server').value = S.config.server;
+  if (S.config.server !== shownServer && document.activeElement !== $('#server')) { $('#server').value = S.config.server; shownServer = S.config.server; }
+  renderServers();
   $('#server-form').hidden = !!S.fixture;
   $('#refresh-events').hidden = !!S.fixture;
   const sel = $('#event');
@@ -230,6 +246,25 @@ function apply(state) {
 
 // events
 $('#server-form').addEventListener('submit', (e) => { e.preventDefault(); window.dp.setServer($('#server').value.trim()).then(apply); });
+$('#server-pick').addEventListener('change', (e) => { if (e.target.value) window.dp.setServer(e.target.value).then(apply); });
+$('#server').addEventListener('input', () => { $('#server-save').textContent = savedServer($('#server').value) ? 'Edit…' : 'Save…'; });
+let editingServer = null; // url of the saved entry open in the dialog, null for a new one
+$('#server-save').addEventListener('click', () => {
+  const url = normServer($('#server').value) || S.config.server;
+  const cur = savedServer(url);
+  editingServer = cur?.url || null;
+  $('#server-dlg-title').textContent = cur ? 'Edit saved server' : 'Save server';
+  $('#server-name').value = cur?.name || '';
+  $('#server-url').value = url;
+  $('#server-delete').hidden = !cur;
+  $('#server-dlg').showModal();
+  $('#server-name').focus();
+});
+$('#server-delete').addEventListener('click', () => { window.dp.removeServer(editingServer).then(apply); $('#server-dlg').close('cancel'); });
+$('#server-dlg form').addEventListener('submit', (e) => {
+  if (e.submitter?.value !== 'save') return;
+  window.dp.saveServer({ name: $('#server-name').value, url: $('#server-url').value }, editingServer).then(apply);
+});
 $('#event').addEventListener('change', (e) => window.dp.setEvent(e.target.value || null).then(apply));
 $('#refresh-events').addEventListener('click', () => window.dp.refreshEvents().then(apply));
 $('#search').addEventListener('input', (e) => { search = e.target.value.trim(); renderComps(); });

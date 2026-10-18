@@ -4,6 +4,7 @@ Electron desktop app for the operator. One window, four areas.
 
 ## 1. Connection bar
 - DanS server address (default `http://localhost:8686`), event dropdown, connection status dot with last update time.
+- Saved servers (decision C-17): a dropdown of named servers next to the address; choosing one connects. **Save…** names the address in the field; **Edit…** (shown when the address is already saved) renames it, changes its address or deletes it. Addresses are normalised (`http://` added, trailing `/` removed).
 - Fixture mode badge when running from a snapshot.
 
 ## 2. Competitions
@@ -31,4 +32,4 @@ Electron desktop app for the operator. One window, four areas.
 - List of output page URLs with a copy button and a live preview thumbnail.
 
 ## Persistence
-- `<userData>/config.json`: server, event, slots, sides, poll interval, running-state mapping.
+- `<userData>/config.json`: server, saved servers, event, slots, sides, poll interval, running-state mapping.

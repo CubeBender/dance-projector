@@ -105,6 +105,11 @@ Claude's decision log. Questions that need the user are asked in the conversatio
 - **Decision:** photos are re-encoded as baseline JPEG, max 900 px wide; originals kept in `photos-original/`.
 - **Why:** smaller, uniform files for OBS. (Added while investigating a missing photo whose real cause was C-13.)
 
+### C-17 Saved DanS servers
+- **Context (2026-10-18):** the user asked to name and save the servers they connect to.
+- **Decision:** a list `servers: [{ name, url }]` in the app config, shown as a dropdown beside the address field; choosing one connects at once. A dialog saves, renames, re-addresses or deletes an entry; an empty name falls back to the host. Editing the address of the connected server reconnects in the background.
+- **Why:** the venue DanS address changes per event; picking by name avoids retyping IPs. The address field keeps what the operator typed until the connected server really changes (it used to be overwritten on every refresh).
+
 ## Changes
 
 - **2026-10-17 – how this file is used.** Before: open questions were listed here as "Pending" for the user to go through. After: questions are asked in the conversation and only recorded here. **Reason:** the user clarified the file is for Claude to keep track. Former P-03 became D-06 (verified); P-06, P-08 and P-10 were asked and became D-07–D-09 and C-07; P-01, P-02, P-04, P-05, P-07, P-09 became Claude's decisions C-01–C-06.

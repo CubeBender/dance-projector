@@ -22,6 +22,8 @@
 - 2026-10-17 **OBS show built with placeholders**: collection "Dance Projector 2026" (14 scenes), shared background, fade/Move/Dip-to-black transitions, pause-media-off-air script (tested: pauses off air, resumes from the same frame). New app pages: schedule, lower third. Branding placeholders in `obs/pages/`. Every scene checked as rendered by OBS.
 - 2026-10-17 Fixed: output pages in OBS stopped loading photos/data because of the 6-connections-per-host browser limit (pages now poll). Fixed: OBS default stylesheet and blur broke the background.
 
+- 2026-10-18 Saved DanS servers: named list next to the address field, save / rename / delete dialog (C-17). Tests extended; checked in a separate test instance of the app.
+
 ## In progress
 - Nothing running. The app is left running on the user's data; OBS is on the new collection with "99 Black" on program.
 

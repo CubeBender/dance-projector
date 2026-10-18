@@ -4,6 +4,8 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 contextBridge.exposeInMainWorld('dp', {
   state: () => ipcRenderer.invoke('state'),
   setServer: (url) => ipcRenderer.invoke('set-server', url),
+  saveServer: (entry, oldUrl) => ipcRenderer.invoke('save-server', entry, oldUrl),
+  removeServer: (url) => ipcRenderer.invoke('remove-server', url),
   refreshEvents: () => ipcRenderer.invoke('refresh-events'),
   setEvent: (id) => ipcRenderer.invoke('set-event', id),
   assign: (slot, compId) => ipcRenderer.invoke('assign', slot, compId),
