@@ -20,3 +20,18 @@
 > I think we could make our own electron app that would allow me to select cometition, add pictures and full display names to judges, track the current running competitions (there can be up to two competitions running at the same time when the dancing floor is split in half. There can technically be more running competitions, but only for limited time while one competition is ending and a new one is starting. For a competition to be running, the judging/evaluation needs to be enabled. The app would have a list of competitions with the running ones highlighted. The user would then select those that he wants to display. The app would have display outputs (web pages), that would show A) heats B) judges C) Maybe also when there are 2 competitions, a split screen that would show what competition is on which side with colour matching the dance floor side lighting (when floor is split, coloured lighting is used to distinguish them from each other). These pages would then be inside scenes of OBS.
 >
 > When working these kinds of projects, I like for you to create memory files. PROMPT.md for the original prompt. DECISIONS.md to write down your questions that require a decision from me and then write down my decision. When decisions change, the change is written down with a reason why change was made. SPEC.md for software or work specifications, PLAN.md for writing down plans, PROGRESS.md to keep track of progress. When the project is split into tasks, create a Docs folder and inside of it create a forder for each separate task that also contains its own PLAN.md, SPEC.md and all other things specific for that task that other tasks dont need. This is a general rule so remember it for future projects as well.
+
+## 4. Revised requirements after technical consultation (2026-11-19)
+
+> After consultation with other technical people, we have revised the required functionality. There is a concern about reading data using the API for the first time LIVE at an event of such importance. There is also no need ATM to show heats. Additionally, judges will be selected randomly for each competition just before the competition start. Therefore the usacases change a bit. First, there will be three modes of operation.
+> 1) Manual mode - The judges will be selected manually by the operator of the software (me).
+> 2) On demand mode - The data will not sync automatically, but on demand so the operator can time the data fetching right after the a judge panel was assigned, thus limiting the API calls.
+> 3) Automatic mode - The current mode that fetches data automatically and frequently.
+>
+> The projection - Push or automatic. Since the judge selection can be in a state that is beying worked on, there is a need to not send the unfinished work to projection, but send the judge panel only after the data has been updated and verified. I imagine a button that "pushes" the current state to projection, which would stay the same until a new update is made.
+>
+> Customization of style - Each competition will have different color scheme. Could you make the colors and the background of the output (projection) customizable?
+>
+> One potential workflow could look like this: The judge panel gets selected and printed in Dans. The list gets printed out to distribute. I can get a copy. I can eather select the panel manually, or I could show the list in front of the web cam and the program could read it and make the selection for me. Is that possible to do and reliable? There would be a human review OFC before this gets pushed to projection.
+>
+> What would be the pros and cons of rewriting this app in RUST?

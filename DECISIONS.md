@@ -40,6 +40,27 @@ Claude's decision log. Questions that need the user are asked in the conversatio
 - **Asked:** adjustable crop per judge, or automatic?
 - **Answer (2026-10-17):** adjustable crop per judge, saved with the photo.
 
+### D-13 Three data modes and a Push step (2026-11-19)
+- **Context:** after consultation, the user is wary of reading the API live for the first time at an important event; judges are drawn randomly just before each competition.
+- **Decision (user):** modes Manual (operator picks the panel), On demand (fetch only when the operator presses a button) and Automatic (current polling). The projection changes only when the operator pushes a verified state; it stays until the next push.
+- **Heats** are not needed for now (user).
+
+### D-14 Manual mode data source
+- **Asked:** where does the list of judges come from in manual mode – read once from DanS ahead, entered in the app, or both?
+- **Answer (2026-11-19):** read the event's judge list once ahead (rehearsal) and keep it locally; manual mode on the day needs no connection.
+
+### D-15 Colour scheme scope and background
+- **Asked:** scheme per competition or per event? Background colours only, colours + image, or also video?
+- **Answer (2026-11-19):** one scheme per event; background from the scheme colours with an optional image.
+
+### D-16 Rust rewrite
+- **Asked:** rewrite in Rust (Tauri) now, later, or stay with Electron?
+- **Answer (2026-11-19):** stay with Electron. (Claude's assessment given in the conversation: Tauri would cut install size and memory, but costs a rewrite of the main process, makes event-day fixes slower, and webcam text recognition is harder natively; output pages stay HTML either way.)
+
+### D-17 Reading the printed panel with the webcam
+- **Context (2026-11-19):** the user asked whether the printed DanS panel list could be read from the webcam, with human review before pushing.
+- **Status:** feasible (offline Tesseract + matching against the known judge list, uncertain matches flagged). Waiting for a photo/scan of a real printout before building it.
+
 ## Claude's decisions
 
 ### C-01 Technology: Electron with plain JavaScript, no framework or build step
@@ -109,6 +130,30 @@ Claude's decision log. Questions that need the user are asked in the conversatio
 - **Context (2026-10-18):** the user asked to name and save the servers they connect to.
 - **Decision:** a list `servers: [{ name, url }]` in the app config, shown as a dropdown beside the address field; choosing one connects at once. A dialog saves, renames, re-addresses or deletes an entry; an empty name falls back to the host. Editing the address of the connected server reconnects in the background.
 - **Why:** the venue DanS address changes per event; picking by name avoids retyping IPs. The address field keeps what the operator typed until the connected server really changes (it used to be overwritten on every refresh).
+
+### C-18 Offline copy of every read
+- **Decision:** each successful DanS read is saved as `cache/<event>.json` (only when the content changed). Manual mode lists and uses these copies; the other modes show the copy at once when an event is chosen and fall back to it when DanS is unreachable.
+- **Why:** implements D-14 without a separate "download" step: the rehearsal read is the copy used on the day.
+
+### C-19 On-demand read = 3 requests
+- **Decision:** the first Fetch now reads everything (as automatic mode does); later presses read only competitions, judges and the judge allocation. Heat draws are no longer read in any mode.
+- **Why:** these are the only parts that change when a panel is drawn; keeps API traffic minimal (D-13).
+
+### C-20 Hand-picked panels override DanS per competition
+- **Decision:** a panel edited by hand is stored per event and competition and wins over DanS in every mode, until "Use DanS panel". The first click on a DanS panel starts from the DanS list. The window shows the difference to DanS.
+- **Why:** the same review step works in all modes: correct a fetched panel or build one from scratch.
+
+### C-21 Push covers everything on screen, style included
+- **Decision:** OBS reads only the pushed state; the draft is served separately for the preview. Style changes, slot changes and the schedule also wait for Push. The window lists which parts differ. "Send every change automatically" restores the old behaviour. The pushed state is saved and restored after a restart.
+- **Why:** D-13 asks that unfinished work never reaches the screen; one rule for everything is easier to trust than exceptions. Photos replaced before a push are kept until the push so the screen never shows a missing image.
+
+### C-22 Style reaches OBS through the existing branding pages
+- **Decision:** `obs/pages/brand.js` polls the app (`SHOW.app`, default `http://localhost:8787`) every 2 s for the pushed style; `background.html` shows lights, solid colour or the image. The OBS sources stay local files; `config.js` colours are the fallback when the app is not running. The server allows cross-origin reads for this.
+- **Why:** no OBS source has to be rewired, and the background still works if the app is closed.
+
+### C-23 Heats removed from use
+- **Decision:** heats are no longer listed in the app, the heats setting is hidden, heat draws are not read, and the build script no longer creates "10 Heats" / "13 Heats B". The page and model code stay.
+- **Why:** D-13 (heats not needed for now); keeping the code makes bringing them back cheap.
 
 ## Changes
 

@@ -46,7 +46,7 @@ st.cfg.slots.A.competitionId = c3.id; st.cfg.slots.B.competitionId = c1.id;
 let out = outputState(m, raw, st, { connected: true });
 assert.strictEqual(out.split, false);
 assert.strictEqual(out.slots.A.label, '', 'no side label on a whole floor');
-assert.strictEqual(out.slots.A.color, st.cfg.wholeColor);
+assert.strictEqual(out.slots.A.color, out.theme.accent, 'whole floor uses the style accent');
 assert.strictEqual(out.slots.B.competition, null, 'slot B unused on a whole floor');
 st.cfg.split = true;
 out = outputState(m, raw, st, { connected: true });

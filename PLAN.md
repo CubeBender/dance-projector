@@ -16,3 +16,15 @@
 4. Control window: connection, competition list, slots, judges editor, output links.
 5. Verify against live DanS: screenshots of each page, selection flow.
 6. OBS: new scene collection using the output pages, transitions, video pause-on-hide script, Touch Portal buttons. Needs the user's assets.
+
+## Revision 2026-11-19 (D-13 to D-17)
+
+| # | Step | State |
+|---|---|---|
+| 1 | Data modes manual / on demand / automatic, offline copy per event | done |
+| 2 | Hand-picked judge panels (Judge panel tab) | done |
+| 3 | Draft vs. pushed projection, previews, Push button | done |
+| 4 | Style per event (Style tab), used by output and branding pages | done |
+| 5 | Heats removed from outputs and OBS build script | done |
+| 6 | Check in OBS: branding pages (local files) read the style from the app | waiting for OBS to run |
+| 7 | Webcam reading of the printed panel | waiting for a sample printout |

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' http://localhost:* http://127.0.0.1:* data:; style-src 'self' 'unsafe-inline'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' http://localhost:* http://127.0.0.1:* data:; frame-src http://localhost:* http://127.0.0.1:*; style-src 'self' 'unsafe-inline'">
 <title>Dance Projector</title>
 <link rel="stylesheet" href="app.css">
 </head>
@@ -18,12 +18,21 @@
   </form>
   <label class="event"><span>Event</span><select id="event"></select></label>
   <button id="refresh-events" class="ghost" title="Reload the list of events">Reload events</button>
+  <!-- How data comes from DanS (decision D-13) -->
+  <div class="modes" id="modes" role="radiogroup" aria-label="Data from DanS">
+    <button data-mode="manual" title="Never contact DanS. Uses the copy saved at the last read; you pick the judges.">Manual</button>
+    <button data-mode="ondemand" title="Read DanS only when you press Fetch now.">On demand</button>
+    <button data-mode="auto" title="Read DanS every 2 seconds.">Automatic</button>
+  </div>
+  <button id="fetch-now" class="primary" title="Read competitions, judges and the judge allocation from DanS now">Fetch now</button>
   <div class="status" id="status"><span class="dot"></span><span id="status-text">Not connected</span></div>
 </header>
 
 <nav class="tabs">
   <button class="tab active" data-tab="competitions">Competitions</button>
+  <button class="tab" data-tab="panel">Judge panel</button>
   <button class="tab" data-tab="judges">Judges</button>
+  <button class="tab" data-tab="style">Style</button>
 </nav>
 
 <main>
@@ -55,12 +64,58 @@
     <p class="empty" id="judges-empty" hidden>Choose an event to load its judges.</p>
   </section>
 
+  <!-- Judge panel of each competition on screen: from DanS, or picked by hand -->
+  <section id="tab-panel" class="pane" hidden>
+    <p class="hint">Click judges to add or remove them. Your choice replaces the panel from DanS until you press <b>Use DanS panel</b>. Nothing reaches the screen until you push.</p>
+    <div id="panels"></div>
+  </section>
+
+  <!-- Colours and background of the projection, one style per event (decision D-15) -->
+  <section id="tab-style" class="pane" hidden>
+    <p class="hint" id="style-for"></p>
+    <div class="style-grid">
+      <div class="style-col">
+        <h3>Colours</h3>
+        <label class="colorrow"><input type="color" data-theme="accent"><span><b>Accent</b><small>Whole-floor colour, highlights, lines</small></span></label>
+        <label class="colorrow"><input type="color" data-theme="secondary"><span><b>Second colour</b><small>Second light on the background</small></span></label>
+        <label class="colorrow"><input type="color" data-theme="ground"><span><b>Background</b><small>Base colour behind everything</small></span></label>
+        <label class="colorrow"><input type="color" data-theme="panel"><span><b>Panels</b><small>Plates behind text and photos</small></span></label>
+        <label class="stack">Panel opacity <input type="range" min="20" max="100" step="1" data-theme="panelOpacity"></label>
+      </div>
+      <div class="style-col">
+        <h3>Background</h3>
+        <div class="chips" id="bg-kind">
+          <button class="chip" data-bg="lights">Moving lights</button>
+          <button class="chip" data-bg="solid">Solid colour</button>
+          <button class="chip" data-bg="image">Image</button>
+        </div>
+        <div class="bg-image" id="bg-image">
+          <div class="bg-thumb" id="bg-thumb">Drop an image here or click to choose</div>
+          <label class="stack">Darken image <input type="range" min="0" max="90" step="1" data-theme="imageDim"></label>
+          <button id="bg-remove" class="ghost">Remove image</button>
+        </div>
+        <button id="theme-reset" class="ghost">Reset style to default</button>
+      </div>
+    </div>
+  </section>
+
   <aside class="side">
+    <!-- What is on the projection vs. what is being prepared (decision D-13) -->
+    <h2>Projection</h2>
+    <div class="proj">
+      <label class="switch small"><input type="checkbox" id="proj-auto"> <span>Send every change automatically</span></label>
+      <select id="preview-page" title="Page shown in the previews"></select>
+      <div class="previews">
+        <figure><figcaption>Prepared</figcaption><div class="pv" id="pv-draft"></div></figure>
+        <figure><figcaption>On screen</figcaption><div class="pv" id="pv-live"></div></figure>
+      </div>
+      <div class="changes" id="proj-changes"></div>
+      <button id="push" class="push">Push to projection</button>
+      <div class="pushed" id="proj-pushed"></div>
+    </div>
+
     <h2>Floor</h2>
     <label class="switch"><input type="checkbox" id="split"> <span>Floor is split in two halves</span></label>
-    <div class="whole" id="whole">
-      <label class="row">Accent colour <input type="color" id="whole-color" title="Accent colour for the whole floor"></label>
-    </div>
     <div id="slots"></div>
 
     <h2>Output pages for OBS</h2>
@@ -74,13 +129,6 @@
     </label>
     <label class="stack">Second language, shown smaller underneath
       <select id="lang-secondary"><option value="en">English</option><option value="cs">Čeština</option><option value="none">None</option></select>
-    </label>
-    <label class="stack">Heats page shows
-      <select id="heats-show">
-        <option value="full">Number, name and club</option>
-        <option value="names">Number and name</option>
-        <option value="numbers">Numbers only</option>
-      </select>
     </label>
 
     <h2>Settings</h2>

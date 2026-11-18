@@ -31,8 +31,16 @@ class DansClient {
     if (eventId) headers['dans-event'] = eventId;
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), this.timeoutMs);
+    let res;
     try {
-      const res = await fetch(this.base + path, { method: 'GET', headers, signal: ctrl.signal });
+      res = await fetch(this.base + path, { method: 'GET', headers, signal: ctrl.signal });
+    } catch (e) {
+      // Node's fetch only says "fetch failed"; tell the operator what actually happened.
+      const server = this.base.replace(/\/api\/1$/, '');
+      if (e.name === 'AbortError') throw new Error(`DanS at ${server} did not answer within ${this.timeoutMs / 1000} s`);
+      throw new Error(`cannot reach DanS at ${server}`);
+    }
+    try {
       if (!res.ok) throw new Error(`DanS ${res.status} for ${path}`);
       return await res.json();
     } finally {

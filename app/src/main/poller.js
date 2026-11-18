@@ -1,5 +1,10 @@
 'use strict';
-// Polls DanS (read-only) and keeps the latest raw data. Emits 'raw' after every successful poll.
+// Reads DanS (read-only) and keeps the latest raw data. Emits 'raw' after every successful read and
+// 'status' after every attempt.
+//
+// Two ways to use it, matching the data modes (D-13):
+//   automatic – start(): reads every intervalMs until stop()
+//   on demand – fetchOnce(): one read when the operator presses Fetch now; nothing happens otherwise
 const { EventEmitter } = require('events');
 const { pickRoundId } = require('./roundpick');
 
@@ -24,7 +29,7 @@ async function fetchRaw(dans, ev, { allDraws = false } = {}) {
 function slimEvent(ev) {
   return {
     id: eventIdOf(ev), name: ev.name, abbreviation: ev.abbreviation,
-    location: ev.location, date: ev.authorities?.[0]?.date,
+    location: ev.location, date: ev.date ?? ev.authorities?.[0]?.date, // ev may already be slim (offline copy)
   };
 }
 
@@ -44,6 +49,35 @@ class Poller extends EventEmitter {
 
   setClient(dans) { this.dans = dans; this.raw = null; this.lastSlow = 0; }
   setEvent(ev) { this.event = ev; this.raw = null; this.lastSlow = 0; this.kick(); }
+  // Starts from data we already have (the offline copy), so an on-demand fetch only needs the parts that
+  // change shortly before a competition.
+  seed(ev, raw) { this.event = ev; this.raw = raw; this.lastSlow = raw ? Date.now() : 0; }
+
+  // On-demand read. First time (no data yet): everything. Afterwards only what changes when a panel is drawn:
+  // competitions (rounds, states, round judges), the event's judge list and the judge allocation.
+  // That is 3 GET requests per press.
+  async fetchOnce() {
+    if (!this.event) throw new Error('Choose an event first');
+    if (this.busy) throw new Error('A read is already running');
+    this.busy = true;
+    try {
+      const e = eventIdOf(this.event);
+      if (!this.raw) this.raw = await fetchRaw(this.dans, this.event);
+      else {
+        const [competitions, judges, allocation] = await Promise.all([this.dans.competitions(e), this.dans.judges(e), this.dans.allocation(e)]);
+        Object.assign(this.raw, { competitions, judges, allocation });
+      }
+      this.raw.fetchedAt = Date.now();
+      this.status = { connected: true, error: null, lastOk: this.raw.fetchedAt };
+      this.emit('raw', this.raw);
+    } catch (err) {
+      this.status = { ...this.status, connected: false, error: String(err.message || err) };
+      throw err;
+    } finally {
+      this.busy = false;
+      this.emit('status', this.status);
+    }
+  }
 
   start() { this.running = true; this.kick(); }
   stop() { this.running = false; clearTimeout(this.timer); this.timer = null; }
@@ -96,6 +130,8 @@ class FixturePoller extends EventEmitter {
   constructor(raw) { super(); this.raw = raw; this.event = raw.event; this.status = { connected: true, error: null, lastOk: Date.now(), fixture: true }; this.wantedRounds = () => []; }
   setClient() {}
   setEvent() { this.kick(); }
+  seed() {}
+  async fetchOnce() { this.kick(); }
   start() { this.kick(); this.timer = setInterval(() => this.kick(), 5000); }
   stop() { clearInterval(this.timer); }
   kick() { this.status.lastOk = Date.now(); this.emit('status', this.status); this.emit('raw', this.raw); }

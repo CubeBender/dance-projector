@@ -8,6 +8,35 @@
   if (new URLSearchParams(location.search).has('bg')) {
     document.documentElement.style.background = `radial-gradient(ellipse at 30% 10%, color-mix(in srgb, ${S.colors?.primary || '#E8B931'} 30%, #0A0D16), #0A0D16 60%)`;
   }
+  // ---- style from the app ----
+  // Asks the app for the pushed state every 2 s and applies its style (theme.js in the app):
+  //   --primary / --secondary / --ground   colours used by these pages
+  //   data-bg on <html>                    'lights' | 'solid' | 'image' (background.html shows the matching layers)
+  //   --bg-image / --bg-dim                background image and how much it is darkened
+  // Pages opened from the app itself (/brand/…) ask their own server; local files in OBS ask SHOW.app.
+  // ?view=draft shows the style being prepared (the app's preview uses it).
+  const params = new URLSearchParams(location.search);
+  const base = location.protocol.startsWith('http') ? '' : (S.app || 'http://localhost:8787');
+  const view = params.get('view') === 'draft' ? 'draft' : 'live';
+  let version = 0;
+  function applyTheme(t) {
+    if (!t) return;
+    root.setProperty('--primary', t.accent);
+    root.setProperty('--secondary', t.secondary);
+    root.setProperty('--ground', t.ground);
+    document.documentElement.dataset.bg = t.imageUrl ? 'image' : (t.background === 'solid' ? 'solid' : 'lights');
+    root.setProperty('--bg-image', t.imageUrl ? `url("${base}${t.imageUrl}")` : 'none');
+    root.setProperty('--bg-dim', String((t.imageDim ?? 40) / 100));
+  }
+  async function pollTheme() {
+    try {
+      const r = await fetch(`${base}/api/state?view=${view}&since=${version}`, { cache: 'no-store' });
+      if (r.status === 200) { const s = await r.json(); version = s.version || 0; applyTheme(s.theme); }
+    } catch { /* app not running: keep the colours from config.js */ }
+    setTimeout(pollTheme, 2000);
+  }
+  pollTheme();
+
   window.BRAND = {
     S, main, second,
     // text in main language with the second language underneath

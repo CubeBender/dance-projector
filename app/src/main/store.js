@@ -1,5 +1,12 @@
 'use strict';
-// JSON settings and judge data in the Electron userData folder.
+// Everything the app keeps on disk, all inside the Electron userData folder (%APPDATA%\dance-projector):
+//
+//   config.json   settings (server, event, modes, slots, styles, …)
+//   judges.json   display names, photos and crops per judge federation id (reused at every event)
+//   panels.json   judge panels picked by the operator: { eventId: { competitionId: [personId, …] } }
+//   cache/        the last data read from DanS per event, for manual mode and for starting without DanS
+//   photos/       judge photos        media/   background images of the styles
+//   pushed.json   what is on the projection (written by projection.js)
 const fs = require('fs');
 const path = require('path');
 
@@ -8,6 +15,12 @@ const DEFAULT_CONFIG = {
   servers: [],           // saved DanS servers: [{ name, url }]
   eventId: null,
   pollMs: 2000,
+  // How data comes from DanS (D-13): 'manual' = never contact DanS, use the offline copy;
+  // 'ondemand' = only when the operator presses Fetch now; 'auto' = poll every pollMs.
+  mode: 'ondemand',
+  // false = the projection changes only on "Push to projection"; true = every change goes straight out.
+  projectionAuto: false,
+  themes: {},            // style per event id, see theme.js
   runningStates: ['InProgress'],
   outputPort: 8787,
   outputHost: '0.0.0.0',
@@ -16,7 +29,7 @@ const DEFAULT_CONFIG = {
     B: { competitionId: null, follow: false, label: 'Pravá strana', labelEn: 'Right side', color: '#FF3B4E' },
   },
   split: false,          // floor split in two halves (only sometimes, for small competitions)
-  wholeColor: '#E8B931', // accent when the whole floor is one competition
+  // wholeColor: older setting for the whole-floor accent; now the style's accent (theme.js) and only read from old configs
   language: { primary: 'cs', secondary: 'en' }, // secondary: 'en' | 'cs' | 'none'
   heatsShow: 'full', // 'full' (number, name, club) | 'names' (number, name) | 'numbers'
 };
@@ -61,10 +74,49 @@ class Store {
   constructor(dir) {
     this.dir = dir;
     this.photoDir = path.join(dir, 'photos');
-    fs.mkdirSync(this.photoDir, { recursive: true });
+    this.mediaDir = path.join(dir, 'media');
+    this.cacheDir = path.join(dir, 'cache');
+    for (const d of [this.photoDir, this.mediaDir, this.cacheDir]) fs.mkdirSync(d, { recursive: true });
     this.config = new JsonFile(path.join(dir, 'config.json'), DEFAULT_CONFIG);
     // judges.json: { "<federation id>": { displayName, photo } }
     this.judges = new JsonFile(path.join(dir, 'judges.json'), {});
+    this.panels = new JsonFile(path.join(dir, 'panels.json'), {});
+  }
+
+  // ---- judge panels picked by the operator (see panels.js) ----
+  panelOverrides(eventId) { return this.panels.data[eventId] || {}; }
+  // ids = list of person ids, or null to go back to the DanS panel
+  setPanel(eventId, compId, ids) {
+    if (!eventId || !compId) return;
+    const ev = this.panels.data[eventId] || (this.panels.data[eventId] = {});
+    if (ids === null) delete ev[compId]; else ev[compId] = [...new Set(ids)];
+    if (!Object.keys(ev).length) delete this.panels.data[eventId];
+    this.panels.save();
+  }
+
+  // ---- offline copy of DanS data, one file per event ----
+  snapshotFile(eventId) { return path.join(this.cacheDir, String(eventId).replace(/[^\w-]/g, '_') + '.json'); }
+  // Written in the background; skipped when the content is the same as last time (automatic mode reads every
+  // 2 s and most reads change nothing).
+  saveSnapshot(raw) {
+    const id = raw?.event?.id;
+    if (!id) return;
+    const json = JSON.stringify({ ...raw, fetchedAt: undefined });
+    if (this.lastSnapshot?.[id] === json) return;
+    (this.lastSnapshot ||= {})[id] = json;
+    const file = this.snapshotFile(id);
+    fs.writeFile(file + '.tmp', JSON.stringify(raw), (err) => { if (!err) fs.rename(file + '.tmp', file, () => {}); });
+  }
+  loadSnapshot(eventId) {
+    try { return JSON.parse(fs.readFileSync(this.snapshotFile(eventId), 'utf8')); } catch { return null; }
+  }
+  // Events that have an offline copy, for the event list when DanS is not used or not reachable.
+  listSnapshots() {
+    const out = [];
+    for (const f of fs.readdirSync(this.cacheDir).filter((x) => x.endsWith('.json'))) {
+      try { const r = JSON.parse(fs.readFileSync(path.join(this.cacheDir, f), 'utf8')); if (r.event?.id) out.push({ ...r.event, fetchedAt: r.fetchedAt }); } catch { /* broken file */ }
+    }
+    return out;
   }
 
   get cfg() { return this.config.data; }
@@ -103,19 +155,25 @@ class Store {
     const ext = path.extname(srcFile).toLowerCase() || '.jpg';
     const name = `${String(fedId).replace(/[^\w-]/g, '_')}-${Date.now()}${ext}`;
     fs.copyFileSync(srcFile, path.join(this.photoDir, name));
-    const old = this.judge(fedId).photo;
+    // The old file is not deleted here: the projection may still show it until the next push.
+    // cleanupFiles() removes it later.
     this.updateJudge(fedId, { photo: name, crop: null });
-    if (old) fs.rm(path.join(this.photoDir, old), { force: true }, () => {});
     return name;
   }
 
-  removePhoto(fedId) {
-    const old = this.judge(fedId).photo;
-    this.updateJudge(fedId, { photo: null, crop: null });
-    if (old) fs.rm(path.join(this.photoDir, old), { force: true }, () => {});
+  removePhoto(fedId) { this.updateJudge(fedId, { photo: null, crop: null }); } // file removed by cleanupFiles()
+
+  // Deletes photos and background images nothing uses any more. keep = file names the projection still shows.
+  cleanupFiles(keep = new Set()) {
+    const used = new Set(keep);
+    for (const j of Object.values(this.judges.data)) if (j.photo) used.add(j.photo);
+    for (const t of Object.values(this.cfg.themes || {})) if (t.image) used.add(t.image);
+    for (const dir of [this.photoDir, this.mediaDir]) {
+      for (const f of fs.readdirSync(dir)) if (!used.has(f)) fs.rm(path.join(dir, f), { force: true }, () => {});
+    }
   }
 
-  flush() { this.config.flush(); this.judges.flush(); }
+  flush() { this.config.flush(); this.judges.flush(); this.panels.flush(); }
 }
 
 module.exports = { Store, DEFAULT_CONFIG, normalizeServer };

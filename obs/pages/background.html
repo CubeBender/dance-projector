@@ -14,13 +14,19 @@
   .floor { position: absolute; left: -10%; right: -10%; bottom: -30%; height: 70%; transform: perspective(900px) rotateX(62deg);
     background: repeating-linear-gradient(90deg, rgba(255,255,255,0.035) 0 2px, transparent 2px 160px), repeating-linear-gradient(0deg, rgba(255,255,255,0.025) 0 2px, transparent 2px 160px);
     mask-image: linear-gradient(to top, rgba(0,0,0,0.9), transparent 80%); }
+  /* Background type from the app's style (brand.js sets data-bg on <html>):
+     lights = the moving pools (default), solid = ground colour only, image = picture darkened by --bg-dim */
+  .image { position: absolute; inset: 0; background: var(--bg-image, none) center / cover no-repeat; display: none; }
+  .image::after { content: ""; position: absolute; inset: 0; background: rgba(0, 0, 0, var(--bg-dim, 0.4)); }
+  [data-bg="image"] .image { display: block; }
+  [data-bg="image"] .pool, [data-bg="image"] .floor, [data-bg="solid"] .pool { display: none; }
   .vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 40%, transparent 40%, rgba(0,0,0,0.65) 100%); }
   @keyframes drift1 { to { transform: translate(520px, 260px) scale(1.12); } }
   @keyframes drift2 { to { transform: translate(-560px, -220px) scale(0.92); } }
 </style>
 </head>
 <body>
-<div class="pool p1"></div><div class="pool p2"></div><div class="floor"></div><div class="vignette"></div>
+<div class="image"></div><div class="pool p1"></div><div class="pool p2"></div><div class="floor"></div><div class="vignette"></div>
 <script src="config.js"></script><script src="brand.js"></script>
 </body>
 </html>

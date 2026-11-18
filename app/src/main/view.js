@@ -1,6 +1,8 @@
 'use strict';
-// Composes what the output pages see: the two display slots with everything already resolved.
+// Composes what the output pages see: the two display slots with everything already resolved,
+// the schedule and the event's style. The result goes to projection.js as the draft.
 const { buildHeats } = require('./model');
+const { themeFor, themeView } = require('./theme');
 
 // Crop is { x, y } in percent (focus point) and zoom >= 1. Missing crop = centred, upper third.
 function cleanCrop(c) {
@@ -21,13 +23,14 @@ function judgeView(j, store) {
   };
 }
 
-function slotView(key, model, raw, store) {
+// theme: the event's style; its accent colours the slot when the whole floor is one competition.
+function slotView(key, model, raw, store, theme) {
   const s = store.cfg.slots[key];
   const split = !!store.cfg.split;
   // Whole floor: slot A only, no side label, neutral accent. Split floor: side names and lighting colours.
   const base = split
     ? { key, label: s.label, labelEn: s.labelEn, color: s.color, competition: null }
-    : { key, label: '', labelEn: '', color: store.cfg.wholeColor, competition: null };
+    : { key, label: '', labelEn: '', color: theme.accent, competition: null };
   if (!split && key !== 'A') return base;
   const comp = model.competitions.find((c) => c.id === s.competitionId) || null;
   if (!comp) return base;
@@ -67,7 +70,9 @@ function scheduleView(model, store) {
 }
 
 function outputState(model, raw, store, status) {
+  const theme = themeFor(store.cfg, store.cfg.eventId);
   return {
+    theme: themeView(theme),
     schedule: scheduleView(model, store),
     updated: Date.now(),
     connected: !!status?.connected,
@@ -75,7 +80,7 @@ function outputState(model, raw, store, status) {
     split: !!store.cfg.split,
     language: store.cfg.language,
     heatsShow: store.cfg.heatsShow,
-    slots: model ? { A: slotView('A', model, raw, store), B: slotView('B', model, raw, store) } : {},
+    slots: model ? { A: slotView('A', model, raw, store, theme), B: slotView('B', model, raw, store, theme) } : {},
   };
 }
 

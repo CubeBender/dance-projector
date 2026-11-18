@@ -4,12 +4,16 @@
 // Media files go to obs/assets/ (not committed to git).
 // ---------------------------------------------------------------------------
 window.SHOW = {
+  // The Dance Projector app. Its style (Style tab, per event) overrides the colours below once the app runs.
+  // Use the app PC's address if OBS runs on another computer.
+  app: 'http://localhost:8787',
   event: {
     name: 'Název soutěže 2026',          // placeholder
     nameEn: 'Competition name 2026',
     place: 'Město · Hala',
     date: '17. 10. 2026',
   },
+  // Fallback colours, used until the app answers (or when it isn't running).
   colors: {
     primary: '#E8B931',   // placeholder accent (gold); replace with brand colour
     secondary: '#1E7BFF', // second brand colour

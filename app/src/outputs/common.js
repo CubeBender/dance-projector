@@ -1,6 +1,13 @@
-// Shared helpers for output pages: live state over SSE, slot selection, bilingual labels, tiny DOM builder.
+// Shared helpers for output pages: live state (polling), the event's style, slot selection, bilingual labels,
+// tiny DOM builder.
+//
+// Query options every page understands:
+//   ?view=draft  show what the operator is preparing instead of what was pushed (used by the app's preview)
+//   ?bg=1        paint the style's background behind the page (for looking at a page outside OBS)
+//   ?scale=0.5   zoom the page
 (function () {
   const q = new URLSearchParams(location.search);
+  const view = q.get('view') === 'draft' ? 'draft' : 'live';
   const debug = q.has('bg') || q.has('debug');
   if (debug) document.body.classList.add('bg');
   if (q.get('scale')) document.documentElement.style.zoom = q.get('scale');
@@ -58,14 +65,36 @@
     return h('span', { class: 'bi ' + cls }, h('span', { class: 'p' }, a), b && b !== a ? h('span', { class: 's' }, b) : null);
   }
 
+  // ---- style (theme.js in the app) ----
+  // "#090B12" + 80 -> "rgba(9, 11, 18, 0.8)"
+  function rgba(hex, pct) {
+    const n = parseInt(String(hex || '#090B12').slice(1), 16);
+    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${(pct ?? 80) / 100})`;
+  }
+  // Turns the style into CSS variables used by common.css and the pages:
+  //   --accent  main accent    --plate  colour of the plates behind text
+  // With ?bg=1 it also paints the background (colour or image) so a page can be checked outside OBS.
+  function applyTheme(t) {
+    if (!t) return;
+    const root = document.documentElement.style;
+    root.setProperty('--accent', t.accent);
+    root.setProperty('--plate', rgba(t.panel, t.panelOpacity));
+    if (debug) {
+      const dim = `linear-gradient(rgba(0,0,0,${(t.imageDim ?? 40) / 100}), rgba(0,0,0,${(t.imageDim ?? 40) / 100}))`;
+      document.body.style.background = t.imageUrl
+        ? `${dim}, url("${t.imageUrl}") center / cover, ${t.ground}`
+        : `radial-gradient(ellipse at 30% 0%, ${rgba(t.accent, 30)}, transparent 60%), ${t.ground}`;
+    }
+  }
+
   // Calls render(state) on every change; keeps the last good state if the app is briefly unreachable.
   // Polls once a second with short requests (no held-open connection; see server.js for why).
   function live(render, everyMs = Number(q.get('poll') || 1000)) {
     let last = null, version = 0;
-    const go = (s) => { last = s; setLanguage(s); try { render(s); } catch (e) { console.error(e); } };
+    const go = (s) => { last = s; setLanguage(s); applyTheme(s.theme); try { render(s); } catch (e) { console.error(e); } };
     async function poll() {
       try {
-        const r = await fetch(`/api/state?since=${version}`, { cache: 'no-store' });
+        const r = await fetch(`/api/state?view=${view}&since=${version}`, { cache: 'no-store' });
         if (r.status === 200) { const s = await r.json(); version = s.version || 0; go(s); }
       } catch { /* app restarting: keep showing the last state */ }
       setTimeout(poll, everyMs);

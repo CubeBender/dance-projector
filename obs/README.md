@@ -6,7 +6,7 @@ Scene collection **Dance Projector 2026**, built by `tools/build_obs_show.py`. L
 
 | Path | What |
 |---|---|
-| `pages/config.js` | **Branding: event name, colours, logo, sponsor list.** Placeholders until the real materials arrive. |
+| `pages/config.js` | **Branding: event name, logo, sponsor list, fallback colours.** Placeholders until the real materials arrive. Colours and the background come from the app's **Style** tab (per event) while the app runs. |
 | `pages/*.html` | Branding pages used as local browser sources: background, logo, sponsors, break |
 | `scripts/pause-media-off-air.lua` | Pauses videos when they go off air, resumes from the same frame (loaded with the collection) |
 | `assets/` | Your media: logo, sponsor logos, videos (not in git) |
@@ -21,10 +21,9 @@ Scene collection **Dance Projector 2026**, built by `tools/build_obs_show.py`. L
 | 02 Sponsors | Sponsor carousel | `pages/sponsors.html` |
 | 03 Sponsor video | Full-screen video, pauses off air | `show.local.json` → `sponsorVideo` |
 | 04 Schedule | Running competitions first, then upcoming by check-in time | app `/out/schedule.html` |
-| 10 Heats | Heats of the current dance, slot A | app |
 | 11 Judges | Judges with photos, slot A | app |
 | 12 Floor | Floor overview: one panel, or two halves when split | app |
-| 13 Heats B / 14 Judges B | Same for slot B (split floor only) | app |
+| 14 Judges B | Same for slot B (split floor only) | app |
 | 20 LIVE | Elgato camera | capture card |
 | 21 LIVE + info | Camera with a lower third (competition, round, dance) | app |
 | 30 Break | Break with clock (add `?until=14:30` to the page URL for a resume time) | `pages/break.html` |

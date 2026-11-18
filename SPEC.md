@@ -15,10 +15,14 @@ Projection for dancesport competitions, built in OBS. Live competition data come
 
 ```mermaid
 flowchart LR
-  D[DanS server<br>/api/1, GET only] -->|poll 2 s| M[Control app<br>main process]
+  D[DanS server<br>/api/1, GET only] -->|manual: never<br>on demand: Fetch now<br>automatic: every 2 s| M[Control app<br>main process]
+  C[(Offline copy<br>per event)] <--> M
   M <-->|IPC| R[Control window]
-  M -->|HTTP :8787 + SSE| O[Output pages<br>heats / judges / split]
+  M -->|draft| P{Push to<br>projection}
+  P -->|pushed state, HTTP :8787, polled| O[Output pages<br>judges / floor / schedule]
   O --> B[OBS browser sources]
+  M -->|style| K[Branding pages<br>background / logo / break]
+  K --> B
   T[Touch Portal] -->|obs-websocket| B
 ```
 
@@ -37,5 +41,14 @@ flowchart LR
 - The operator assigns competitions to display slot A and slot B.
 - Each slot has a floor side name and a colour matching the floor lighting.
 - Judges: add a photo and a display name per judge; stored per federation ID.
-- Output pages: heats, judges and split screen, for 1920×1080, transparent background, live updates without reload.
+- Output pages: judges, floor overview, schedule, lower third, for 1920×1080, transparent background, updates without reload. (Heats exist but are not used for now, D-13.)
 - Settings and judge data persist between app restarts.
+
+## Revised requirements (2026-11-19, decisions D-13 to D-17)
+
+- **Data modes.** Manual: no contact with DanS; the operator picks the panels from the event's judge list kept in the offline copy. On demand: DanS is read only when the operator presses **Fetch now** (3 GET requests once data exists). Automatic: polling every 2 s as before.
+- **Offline copy.** Every successful read is saved per event, so data read during the rehearsal is available on the day without DanS.
+- **Judge panels.** Per competition, from DanS or picked by hand; a hand-picked panel wins until the operator goes back to the DanS panel.
+- **Push to projection.** OBS shows only the pushed state. The window shows a preview of the prepared state next to what is on screen, and lists what is not pushed yet. A switch sends every change automatically instead. The pushed state survives a restart.
+- **Style per event.** Accent, second colour, background colour, panel colour and opacity; background as moving lights, a solid colour or an image (darkened by a set amount). Used by the output pages and by the OBS branding pages.
+- **Reading the printed panel with a webcam** (D-17): planned after a sample printout is available.

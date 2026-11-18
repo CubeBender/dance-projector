@@ -9,7 +9,7 @@
     "fixture": "electron . --fixture=fixtures/sample.json",
     "snapshot": "node scripts/snapshot.js",
     "anonymize": "node scripts/anonymize-fixture.js",
-    "test": "node scripts/test-model.js && node scripts/test-store.js",
+    "test": "node scripts/test-model.js && node scripts/test-store.js && node scripts/test-workflow.js",
     "preview": "node scripts/preview-server.js"
   },
   "devDependencies": {

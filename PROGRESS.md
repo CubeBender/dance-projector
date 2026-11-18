@@ -24,10 +24,15 @@
 
 - 2026-10-18 Saved DanS servers: named list next to the address field, save / rename / delete dialog (C-17). Tests extended; checked in a separate test instance of the app.
 
+- 2026-11-19 **Revised workflow** (D-13 to D-16, C-18 to C-23): data modes Manual / On demand / Automatic, offline copy per event, Judge panel tab (hand-picked panels), draft vs. pushed projection with previews and Push button, style per event (colours, background lights / solid / image) used by output and branding pages, heats removed. Tests extended (`test-workflow.js`). Checked in a separate test instance on the sample event: panel edit, push, style change (draft pink, screen gold until push), on-demand failure keeps the offline data with a clear error.
+
 ## In progress
-- Nothing running. The app is left running on the user's data; OBS is on the new collection with "99 Black" on program.
+- Nothing running.
 
 ## Next
+- In OBS: check that the branding pages (local files) pick up the style from the app; remove the "10 Heats" and "13 Heats B" scenes from the live collection (or rebuild it).
+- User: send a photo or scan of a printed DanS panel list, so webcam reading (D-17) can be built and tested.
+- User: rehearsal read with On demand against the real DanS server, then try Manual mode with the offline copy.
 - User: look at the new collection in OBS; set up the Touch Portal page (Docs/obs-show/TOUCH_PORTAL.md).
 - User: real materials (logo, colours, sponsor logos/videos) → obs/assets + obs/pages/config.js.
 - Optional: ask GitHub support to purge cached old commits, or re-create the repository.

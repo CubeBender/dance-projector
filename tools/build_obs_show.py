@@ -44,16 +44,16 @@ def show_plan(app, local):
     cap = local.get("captureSettings") or {}
     out = lambda p: f"{app}/out/{p}"
     return [
+        # The branding pages read the event's style (colours, background image) from the app; see obs/pages/brand.js.
         (BG, [("Background", "browser_source", browser(local="background.html"))]),
         ("01 Logo", [("@scene", BG), ("Logo", "browser_source", browser(local="logo.html", restart=True))]),
         ("02 Sponsors", [("@scene", BG), ("Sponsors", "browser_source", browser(local="sponsors.html", restart=True))]),
         ("03 Sponsor video", [("Sponsor video", "ffmpeg_source", {"local_file": video, "is_local_file": True, "looping": True,
                                "restart_on_activate": False, "close_when_inactive": False, "clear_on_media_end": False, "hw_decode": True})]),
         ("04 Schedule", [("@scene", BG), ("Schedule", "browser_source", browser(url=out("schedule.html")))]),
-        ("10 Heats", [("@scene", BG), ("Heats A", "browser_source", browser(url=out("heats.html?slot=A")))]),
+        # Heats scenes ("10 Heats", "13 Heats B") removed 2026-11-19: heats are not shown for now (decision D-13).
         ("11 Judges", [("@scene", BG), ("Judges A", "browser_source", browser(url=out("judges.html?slot=A")))]),
         ("12 Floor", [("@scene", BG), ("Floor overview", "browser_source", browser(url=out("split.html")))]),
-        ("13 Heats B", [("@scene", BG), ("Heats B", "browser_source", browser(url=out("heats.html?slot=B")))]),
         ("14 Judges B", [("@scene", BG), ("Judges B", "browser_source", browser(url=out("judges.html?slot=B")))]),
         ("20 LIVE", [("Camera", "dshow_input", cap)]),
         ("21 LIVE + info", [("@source", "Camera"), ("Lower third A", "browser_source", browser(url=out("lowerthird.html?slot=A")))]),
