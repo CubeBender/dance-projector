@@ -34,7 +34,7 @@ live((state) => {
   keyed(root, JSON.stringify([slot?.color, comp?.number, comp?.title, r?.name, r?.currentDance]), () => {
     if (!comp) return debug ? [h('div', { class: 'empty-hint' }, `Slot ${slotKey} has no competition`)] : [];
     return [h('div', { class: 'bar enter' },
-      h('div', { class: 'card' }, comp.number),
+      comp.number != null ? h('div', { class: 'card' }, comp.number) : null, // own selection may have no number
       h('div', { class: 'title' }, bi(L.title(comp)), r ? h('div', { class: 'meta' }, bi(L.round(r))) : null),
       d ? h('div', { class: 'now' }, h('div', { class: 'lbl caps' }, bi(L.t('now'), 'inline')), h('div', { class: 'dn' }, bi(L.dance(d)))) : h('div'))];
   });

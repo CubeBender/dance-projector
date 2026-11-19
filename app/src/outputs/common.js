@@ -121,8 +121,12 @@
 
   function header(slot, comp, { showDances = true } = {}) {
     const r = comp.round;
-    const plate = h('div', { class: 'head enter' },
-      h('div', { class: 'card' }, comp.number),
+    const side = slot.label || slot.labelEn;
+    // An own selection (made without DanS) may have no number, title or round: then show only what was typed,
+    // and no plate at all when there is nothing to say.
+    if (comp.number == null && !comp.title && !comp.titleEn && !r && !side) return [];
+    const plate = h('div', { class: 'head enter' + (comp.number == null ? ' no-number' : '') },
+      comp.number != null ? h('div', { class: 'card' }, comp.number) : null,
       h('div', { class: 'head-text' }, h('div', { class: 'title' }, bi(L.title(comp))), r ? h('div', { class: 'meta' }, bi(roundMeta(r))) : null),
       slot.label || slot.labelEn ? h('div', { class: 'side-chip caps' }, bi(L.side(slot))) : null);
     if (!showDances || !r || !r.dances.length) return [plate];

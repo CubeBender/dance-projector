@@ -41,3 +41,9 @@
 > I will be building a gallery of judges that I want to keep so I dont have to do it from scratch every time. Inside the Docs/judges folder, there are photos of judges named IDT Surname Name Number (optional). I want to keep a gallery of judges and save them inside of the app. Each judge is uniquelly identified by their IDT with Name and Surname editable (this should be in the app already). Some judges sent multiple photos. I want to keep all of them and select the main photo / portrait from these so I can change, add, remove etc later.
 
 > Also, comment your code more often, please, I am reviewing it and sometimes I have hard time following what is happening.
+
+## 6. Deleting judges, selection without DanS (2026-11-19)
+
+> There are few more adjustments:
+> 1) please allow me to delete judges in the Judges gallery (with confirmation window)
+> 2) I also need to be able to show judge selection even without a connection to Dans server. How do I do that? I envisioned there beying a Judge gallery, where I can edit judges and judge selection page, where I can edit the current judge panel/selection.

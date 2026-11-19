@@ -70,4 +70,32 @@ assert.strictEqual(v.name, 'Petr Dvořák'); assert.strictEqual(v.photo, null);
 s.flush();
 s = new Store(dir);
 assert.strictEqual(s.judge('10000001').photos.length, 1, 'persisted');
+
+// ---- own selection without DanS (D-19) ----
+const { toggleManual, nextLetter, cleanLetter } = require('../src/main/panels');
+const { outputState } = require('../src/main/view');
+let sel = toggleManual([], '10000001');
+sel = toggleManual(sel, '10000002');
+assert.deepStrictEqual(sel, [{ fedId: '10000001', letter: 'A' }, { fedId: '10000002', letter: 'B' }]);
+assert.strictEqual(nextLetter([{ letter: 'A' }, { letter: 'C' }]), 'B', 'fills gaps');
+assert.strictEqual(nextLetter(Array.from({ length: 26 }, (_, i) => ({ letter: String.fromCharCode(65 + i) }))), 'AA');
+assert.deepStrictEqual(toggleManual(sel, '10000001'), [{ fedId: '10000002', letter: 'B' }], 'second click removes');
+assert.strictEqual(cleanLetter(' k-1x '), 'K1X'); assert.strictEqual(cleanLetter('abcd'), 'ABC');
+s.ensureJudge('10000002', { name: 'Petr', surname: 'Dvořák' });
+s.updateConfig({ slots: { A: { source: 'manual' } }, manualPanels: { A: { number: '7', title: 'Finále Senioři', judges: [{ fedId: '10000002', letter: 'B' }, { fedId: '10000001', letter: 'A' }, { fedId: '19999999', letter: 'C' }] } } });
+// no DanS data at all (model null): the own selection is still on screen
+let out = outputState(null, {}, s, { connected: false });
+const comp = out.slots.A.competition;
+assert.ok(comp.manual); assert.strictEqual(comp.number, '7'); assert.strictEqual(comp.title, 'Finále Senioři'); assert.strictEqual(comp.round, null);
+assert.deepStrictEqual(comp.judges.map((j) => `${j.letter} ${j.name}`), ['A Ing. Jana Nováková', 'B Petr Dvořák'], 'sorted by letter; unknown IDT dropped');
+assert.ok(comp.judges[0].photo, 'gallery main photo');
+// a DanS side without data is simply empty
+s.updateConfig({ slots: { A: { source: 'dans' } } });
+assert.strictEqual(outputState(null, {}, s, {}).slots.A.competition, null);
+// deleting a judge removes the gallery entry and the place in the own selection
+s.deleteJudge('10000001');
+assert.deepStrictEqual(s.judge('10000001'), {});
+assert.deepStrictEqual(s.cfg.manualPanels.A.judges.map((j) => j.fedId), ['10000002', '19999999']);
+s.updateConfig({ slots: { A: { source: 'manual' } } });
+assert.deepStrictEqual(outputState(null, {}, s, {}).slots.A.competition.judges.map((j) => j.letter), ['B']);
 console.log('OK');

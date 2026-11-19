@@ -40,4 +40,24 @@ function togglePanel(current, dansIds, personId) {
   return base.includes(personId) ? base.filter((id) => id !== personId) : [...base, personId];
 }
 
-module.exports = { applyPanels, togglePanel };
+// ---- own selections (D-19): judges from the gallery, no DanS ----
+// A selection is a list of { fedId, letter }. Letters are what the audience sees on the judges' marks.
+
+// "a " -> "A"; at most 3 characters, letters and digits only.
+const cleanLetter = (l) => String(l || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3);
+
+// First of A, B, C … Z (then AA, AB …) that nobody in the list has yet.
+function nextLetter(list) {
+  const used = new Set(list.map((j) => j.letter));
+  for (let i = 0; ; i++) {
+    const l = i < 26 ? String.fromCharCode(65 + i) : String.fromCharCode(64 + Math.floor(i / 26)) + String.fromCharCode(65 + (i % 26));
+    if (!used.has(l)) return l;
+  }
+}
+
+// Adds the judge with the next free letter, or removes them if already selected. Returns a new list.
+function toggleManual(list = [], fedId) {
+  return list.some((j) => j.fedId === fedId) ? list.filter((j) => j.fedId !== fedId) : [...list, { fedId, letter: nextLetter(list) }];
+}
+
+module.exports = { applyPanels, togglePanel, cleanLetter, nextLetter, toggleManual };

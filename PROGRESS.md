@@ -29,6 +29,8 @@
 - 2026-11-19 **Judge gallery** (D-18, C-24): gallery per IDT with editable names, several photos per judge, main portrait, crop per photo, folder import, New judge, filters and search. Existing 6 judges convert automatically. Tested in a separate copy of the user's data: import of `Docs/judges` added 31 photos for 17 judges, a second import skipped all 31, main photo / delete / rename / crop work. One photo file in the folder is truncated (incomplete JPEG) and cannot be imported. `Docs/judges/` git-ignored.
 - 2026-11-19 **Photo fixes** (C-25): photos with an EXIF orientation tag no longer appear rotated; the truncated JPEG now imports (practically complete); ↺ / ↻ buttons in Adjust photo. Checked on a copy of the user's current data: Import folder… again redid 31 photos (the two sideways ones now upright), added the missing one, failed none; a further import skipped all 32; rotate right gives 1200×900, back gives 900×1200.
 
+- 2026-11-19 **Own selection and Delete judge** (D-19, C-26): Judge selection tab with From DanS / Own selection per side; own selection works with no DanS data and no event (gallery judges, editable letters, optional number/title/round). Delete judge… with a confirmation window. Judge cards keep double surnames together. Checked in an empty test instance with made-up judges: select, letters, push, rendered page with and without number/title, delete with Cancel and with Delete.
+
 ## In progress
 - Nothing running.
 

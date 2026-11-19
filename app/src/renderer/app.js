@@ -310,8 +310,31 @@ function judgeCard(g) {
       dansDiffers ? h('div', { class: 'jfed' }, `DanS has: ${g.dansName} ${g.dansSurname}`) : null,
       field('displayName', 'Name on screen (optional)', `${g.name || g.dansName} ${g.surname || g.dansSurname}`.trim(),
         'Replaces "Name Surname" on the projection, for example with a title. Leave empty to use the name and surname.'),
-      strip));
+      strip,
+      g.inGallery ? h('div', { class: 'jactions end' },
+        h('button', { class: 'ghost danger', onclick: () => confirmDeleteJudge(g) }, 'Delete judge…')) : null));
 }
+
+// Asks before deleting a judge from the gallery, and says exactly what goes with them.
+let deletingJudge = null;
+function confirmDeleteJudge(g) {
+  deletingJudge = g.fedId;
+  const inOwn = ['A', 'B'].filter((k) => (S.config.manualPanels?.[k]?.judges || []).some((j) => j.fedId === g.fedId));
+  $('#jd-text').textContent = `${judgeName(g)} (IDT ${g.fedId}) will be removed from the gallery:`;
+  $('#jd-list').replaceChildren(...[
+    h('li', null, g.photos.length ? `${g.photos.length} photo${g.photos.length === 1 ? '' : 's'}, with their framing` : 'no photos'),
+    h('li', null, 'the name, surname and name on screen kept here'),
+    inOwn.length ? h('li', null, `the judge's place in the own selection${inOwn.length > 1 ? 's' : ''} (${inOwn.join(', ')})`) : null,
+    g.inEvent ? h('li', { class: 'sub' }, 'The judge stays listed from the DanS event, without photos.') : null,
+    h('li', { class: 'sub' }, 'This cannot be undone; the photos can be imported again from their files.'),
+  ].filter(Boolean)); // replaceChildren would print "null" for the skipped lines
+  $('#judge-del-dlg').showModal();
+}
+// Saved from the form's submit (fires at once), like the other dialogs
+$('#judge-del-dlg form').addEventListener('submit', (e) => {
+  if (e.submitter?.value === 'delete' && deletingJudge) window.dp.judgeDelete(deletingJudge).then(apply);
+  deletingJudge = null;
+});
 
 function renderJudges() {
   let list = S.gallery;
@@ -351,51 +374,138 @@ function renderSettings() {
   if (document.activeElement !== $('#running-states')) $('#running-states').value = S.config.runningStates.join(', ');
 }
 
-// ---- Judge panel tab ----
-// One block per competition on screen (slot A, and B when the floor is split). Shows the panel that will be
-// projected and every judge of the event as a toggle button.
+// ---- Judge selection tab ----
+// One block per screen side (A, and B when the floor is split). Each side shows one of two sources:
+//   From DanS     – the panel of the competition chosen in Competitions (DanS allocation, editable)
+//   Own selection – judges picked from the gallery with letters set here; needs no DanS data at all (D-19)
 const PANEL_SOURCE = {
   dans: 'Panel from DanS',
   manual: 'Picked by hand',
   none: 'No panel yet',
 };
+const psearch = { A: '', B: '' }; // search text of each side's gallery picker
+
 function renderPanels() {
   const wrap = $('#panels');
+  // don't redraw under the cursor while a field (letter, title, search) is being typed in
+  if (wrap.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return;
   const keys = S.config.split ? ['A', 'B'] : ['A'];
-  const blocks = keys.map((k) => {
+  wrap.replaceChildren(...keys.map((k) => {
     const slot = S.config.slots[k];
-    const c = S.competitions.find((x) => x.id === slot.competitionId);
     const color = S.config.split ? slot.color : S.theme.accent;
-    const head = h('div', { class: 'pnl-head' },
-      h('span', { class: 'slot-key' }, S.config.split ? k : ''),
-      c ? h('div', { class: 'pnl-title' }, h('b', null, `${c.number} · ${c.title}`), h('div', { class: 'sub' }, c.round ? `${c.round.name} · ${c.round.state}` : 'No round yet'))
-        : h('div', { class: 'pnl-title' }, h('span', { class: 'sub' }, S.config.split ? `Nothing on side ${k}. Use the ${k} buttons in Competitions.` : 'Nothing on screen. Press Show in Competitions.')));
-    if (!c) return h('section', { class: 'pnl', '--c': color }, head);
+    const own = slot.source === 'manual';
+    const sources = h('div', { class: 'chips' },
+      h('button', { class: 'chip' + (own ? '' : ' active'), onclick: () => window.dp.setSlotSource(k, 'dans').then(apply) }, 'From DanS'),
+      h('button', { class: 'chip' + (own ? ' active' : ''), onclick: () => window.dp.setSlotSource(k, 'manual').then(apply),
+        title: 'Pick judges from the gallery. Works without DanS.' }, 'Own selection'));
+    const body = own ? manualBlock(k) : dansBlock(k, slot);
+    return h('section', { class: 'pnl', '--c': color },
+      h('div', { class: 'pnl-head' }, h('span', { class: 'slot-key' }, S.config.split ? k : ''), sources, body.title),
+      ...body.parts);
+  }));
+}
 
-    const chosen = new Set(c.judgeIds);
-    const dans = new Set(c.dansJudgeIds);
-    // Differences to DanS, so a hand-picked panel that disagrees with the draw is easy to spot
-    const added = c.panelSource === 'manual' ? c.judgeIds.filter((id) => !dans.has(id)).length : 0;
-    const removed = c.panelSource === 'manual' ? c.dansJudgeIds.filter((id) => !chosen.has(id)).length : 0;
-    const diff = c.panelSource === 'manual' && c.dansJudgeIds.length
-      ? (added || removed ? ` · differs from DanS (+${added} / −${removed})` : ' · same as DanS') : '';
-    const tools = h('div', { class: 'pnl-tools' },
-      h('span', { class: 'src ' + c.panelSource }, PANEL_SOURCE[c.panelSource] + diff),
-      h('span', { class: 'count' }, `${c.judgeIds.length} selected`),
-      c.panelSource === 'manual' ? h('button', { onclick: () => window.dp.panelReset(c.id).then(apply), title: 'Forget your choice and use the allocation read from DanS' }, 'Use DanS panel') : null,
-      c.judgeIds.length ? h('button', { class: 'ghost', onclick: () => window.dp.panelClear(c.id).then(apply) }, 'Clear') : null);
-    const grid = h('div', { class: 'pick' }, S.judges.map((j) => h('button', {
-      class: 'pick-j' + (chosen.has(j.personId) ? ' on' : '') + (dans.has(j.personId) ? ' dans' : ''),
-      title: (chosen.has(j.personId) ? 'Remove from' : 'Add to') + ' the panel' + (dans.has(j.personId) ? ' (in the DanS panel)' : ''),
-      onclick: () => window.dp.panelToggle(c.id, j.personId).then(apply),
-    },
-    h('span', { class: 'pj-ph' }, j.photo ? cropImg(j.photo, j.crop) : null),
-    h('span', { class: 'jletter' }, j.letter || '–'),
-    h('span', { class: 'pj-name' }, j.displayName || `${j.name} ${j.surname}`))));
-    return h('section', { class: 'pnl', '--c': color }, head, tools,
-      S.judges.length ? grid : h('p', { class: 'empty' }, 'No judges in this event’s data. Fetch the data from DanS first.'));
+// Own selection of one side: optional competition details, the chosen judges with editable letters, and the
+// gallery as toggle buttons.
+function manualBlock(k) {
+  const m = S.config.manualPanels?.[k] || { judges: [] };
+  const byId = new Map(S.gallery.map((g) => [g.fedId, g]));
+  const chosen = (m.judges || []).filter((j) => byId.get(j.fedId)?.inGallery);
+  const field = (key, label, placeholder, cls = '') => {
+    const input = h('input', { value: m[key] || '', placeholder, class: cls });
+    input.addEventListener('change', () => window.dp.manualUpdate(k, { [key]: input.value }).then(apply));
+    return h('label', { class: 'stack' }, h('small', null, label), input);
+  };
+  const details = h('div', { class: 'own-details' },
+    field('number', 'No.', '–', 'num'),
+    field('title', 'Competition (main language)', 'optional, e.g. Mistrovství ČR Senioři STT'),
+    field('titleEn', 'Competition (second language)', 'optional'),
+    field('round', 'Round', 'optional, e.g. Finále'));
+
+  // chosen judges sorted by letter; the letter can be changed (Enter or leaving the field saves it)
+  const rows = chosen.slice().sort((a, b) => a.letter.localeCompare(b.letter, 'cs')).map((j) => {
+    const g = byId.get(j.fedId);
+    const main = g.photos.find((p) => p.file === g.main);
+    const letter = h('input', { class: 'own-letter', value: j.letter, maxlength: '3', title: 'Judge letter shown on screen' });
+    letter.addEventListener('change', () => window.dp.manualLetter(k, j.fedId, letter.value).then(apply));
+    return h('div', { class: 'own-row' },
+      h('span', { class: 'pj-ph' }, main ? cropImg(main.url, main.crop) : null),
+      letter,
+      h('span', { class: 'pj-name' }, g.displayName || judgeName(g)),
+      h('button', { class: 'ghost', title: 'Remove from the selection', onclick: () => window.dp.manualToggle(k, j.fedId).then(apply) }, '×'));
   });
-  wrap.replaceChildren(...blocks);
+  const letters = chosen.map((j) => j.letter);
+  const dup = letters.filter((l, i) => letters.indexOf(l) !== i);
+
+  // the gallery as a picker; the search box filters the buttons in place (no redraw while typing)
+  const inSel = new Set(chosen.map((j) => j.fedId));
+  const gallery = S.gallery.filter((g) => g.inGallery);
+  const buttons = gallery.map((g) => {
+    const main = g.photos.find((p) => p.file === g.main);
+    return h('button', {
+      class: 'pick-j' + (inSel.has(g.fedId) ? ' on' : ''), 'data-q': `${g.fedId} ${judgeName(g)} ${g.displayName}`.toLowerCase(),
+      title: inSel.has(g.fedId) ? 'Remove from the selection' : 'Add to the selection',
+      onclick: () => window.dp.manualToggle(k, g.fedId).then(apply),
+    }, h('span', { class: 'pj-ph' }, main ? cropImg(main.url, main.crop) : null),
+    h('span', { class: 'jletter' }, chosen.find((j) => j.fedId === g.fedId)?.letter || '+'),
+    h('span', { class: 'pj-name' }, g.displayName || judgeName(g)));
+  });
+  const filter = () => { const q = psearch[k].toLowerCase(); for (const b of buttons) b.hidden = !!q && !b.dataset.q.includes(q); };
+  const search = h('input', { class: 'own-search', placeholder: 'Find IDT or name', value: psearch[k] });
+  search.addEventListener('input', () => { psearch[k] = search.value.trim(); filter(); });
+  filter();
+
+  return {
+    title: h('div', { class: 'pnl-title' }, h('span', { class: 'sub' }, 'Judges from the gallery. Works without DanS.')),
+    parts: [
+      details,
+      h('div', { class: 'pnl-tools' },
+        h('span', { class: 'src manual' }, `${chosen.length} selected`),
+        dup.length ? h('span', { class: 'err' }, `Letter ${[...new Set(dup)].join(', ')} is used twice`) : null,
+        h('span', { class: 'count' }),
+        chosen.length ? h('button', { class: 'ghost', onclick: () => window.dp.manualClear(k).then(apply) }, 'Clear') : null),
+      rows.length ? h('div', { class: 'own-rows' }, rows) : h('p', { class: 'hint' }, 'Click judges below to add them. Letters are given A, B, C… and can be changed.'),
+      gallery.length
+        ? [h('div', { class: 'own-pick-head' }, h('b', null, 'Gallery'), search), h('div', { class: 'pick' }, buttons)]
+        : h('p', { class: 'empty' }, 'The gallery is empty. Add judges in the Judges tab (Import folder… or New judge…).'),
+    ].flat(),
+  };
+}
+
+// Panel of the DanS competition shown on this side (from the allocation, editable).
+function dansBlock(k, slot) {
+  const c = S.competitions.find((x) => x.id === slot.competitionId);
+  const title = c
+    ? h('div', { class: 'pnl-title' }, h('b', null, `${c.number} · ${c.title}`), h('div', { class: 'sub' }, c.round ? `${c.round.name} · ${c.round.state}` : 'No round yet'))
+    : h('div', { class: 'pnl-title' }, h('span', { class: 'sub' }, S.competitions.length
+      ? (S.config.split ? `Nothing on side ${k}. Use the ${k} buttons in Competitions.` : 'Nothing on screen. Press Show in Competitions.')
+      : 'No DanS data. Use Own selection to pick judges from the gallery.'));
+  if (!c) return { title, parts: [] };
+  return { title, parts: dansParts(c) };
+}
+
+function dansParts(c) {
+  const chosen = new Set(c.judgeIds);
+  const dans = new Set(c.dansJudgeIds);
+  // Differences to DanS, so a hand-picked panel that disagrees with the draw is easy to spot
+  const added = c.panelSource === 'manual' ? c.judgeIds.filter((id) => !dans.has(id)).length : 0;
+  const removed = c.panelSource === 'manual' ? c.dansJudgeIds.filter((id) => !chosen.has(id)).length : 0;
+  const diff = c.panelSource === 'manual' && c.dansJudgeIds.length
+    ? (added || removed ? ` · differs from DanS (+${added} / −${removed})` : ' · same as DanS') : '';
+  const tools = h('div', { class: 'pnl-tools' },
+    h('span', { class: 'src ' + c.panelSource }, PANEL_SOURCE[c.panelSource] + diff),
+    h('span', { class: 'count' }, `${c.judgeIds.length} selected`),
+    c.panelSource === 'manual' ? h('button', { onclick: () => window.dp.panelReset(c.id).then(apply), title: 'Forget your choice and use the allocation read from DanS' }, 'Use DanS panel') : null,
+    c.judgeIds.length ? h('button', { class: 'ghost', onclick: () => window.dp.panelClear(c.id).then(apply) }, 'Clear') : null);
+  const grid = h('div', { class: 'pick' }, S.judges.map((j) => h('button', {
+    class: 'pick-j' + (chosen.has(j.personId) ? ' on' : '') + (dans.has(j.personId) ? ' dans' : ''),
+    title: (chosen.has(j.personId) ? 'Remove from' : 'Add to') + ' the panel' + (dans.has(j.personId) ? ' (in the DanS panel)' : ''),
+    onclick: () => window.dp.panelToggle(c.id, j.personId).then(apply),
+  },
+  h('span', { class: 'pj-ph' }, j.photo ? cropImg(j.photo, j.crop) : null),
+  h('span', { class: 'jletter' }, j.letter || '–'),
+  h('span', { class: 'pj-name' }, j.displayName || `${j.name} ${j.surname}`))));
+  return [tools, S.judges.length ? grid : h('p', { class: 'empty' }, 'No judges in this event’s data. Fetch the data from DanS first.')];
 }
 
 // ---- Style tab ----

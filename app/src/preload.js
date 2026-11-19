@@ -25,6 +25,12 @@ contextBridge.exposeInMainWorld('dp', {
   panelToggle: (compId, personId) => ipcRenderer.invoke('panel-toggle', compId, personId),
   panelReset: (compId) => ipcRenderer.invoke('panel-reset', compId),
   panelClear: (compId) => ipcRenderer.invoke('panel-clear', compId),
+  // own selections without DanS (slot 'A' | 'B')
+  setSlotSource: (slot, source) => ipcRenderer.invoke('set-slot-source', slot, source), // 'dans' | 'manual'
+  manualUpdate: (slot, patch) => ipcRenderer.invoke('manual-update', slot, patch),      // number, title, titleEn, round
+  manualToggle: (slot, fedId) => ipcRenderer.invoke('manual-toggle', slot, fedId),
+  manualLetter: (slot, fedId, letter) => ipcRenderer.invoke('manual-letter', slot, fedId, letter),
+  manualClear: (slot) => ipcRenderer.invoke('manual-clear', slot),
   // style of the current event
   setTheme: (patch) => ipcRenderer.invoke('set-theme', patch),
   themeReset: () => ipcRenderer.invoke('theme-reset'),
@@ -36,6 +42,7 @@ contextBridge.exposeInMainWorld('dp', {
   judgePhotosAdd: (fedId, files, makeMain) => ipcRenderer.invoke('judge-photos-add', fedId, files ? [...files].map((f) => webUtils.getPathForFile(f)) : null, makeMain),
   judgePhotoMain: (fedId, file) => ipcRenderer.invoke('judge-photo-main', fedId, file),
   judgePhotoDelete: (fedId, file) => ipcRenderer.invoke('judge-photo-delete', fedId, file),
+  judgeDelete: (fedId) => ipcRenderer.invoke('judge-delete', fedId),
   judgeCrop: (fedId, crop, file) => ipcRenderer.invoke('judge-crop', fedId, crop, file),
   judgePhotoRotate: (fedId, file, degrees) => ipcRenderer.invoke('judge-photo-rotate', fedId, file, degrees), // -> { state, file }
   galleryImport: (dir) => ipcRenderer.invoke('gallery-import', dir), // no dir = folder dialog

@@ -30,7 +30,7 @@
 
 <nav class="tabs">
   <button class="tab active" data-tab="competitions">Competitions</button>
-  <button class="tab" data-tab="panel">Judge panel</button>
+  <button class="tab" data-tab="panel">Judge selection</button>
   <button class="tab" data-tab="judges">Judges</button>
   <button class="tab" data-tab="style">Style</button>
 </nav>
@@ -73,9 +73,9 @@
     <p class="empty" id="judges-empty" hidden></p>
   </section>
 
-  <!-- Judge panel of each competition on screen: from DanS, or picked by hand -->
+  <!-- Judge selection per screen side: panel from DanS (editable) or own selection from the gallery -->
   <section id="tab-panel" class="pane" hidden>
-    <p class="hint">Click judges to add or remove them. Your choice replaces the panel from DanS until you press <b>Use DanS panel</b>. Nothing reaches the screen until you push.</p>
+    <p class="hint">For each side choose <b>From DanS</b> (the panel of the competition shown, editable; <b>Use DanS panel</b> undoes your edits) or <b>Own selection</b> (judges from the gallery, no DanS needed). Nothing reaches the screen until you push.</p>
     <div id="panels"></div>
   </section>
 
@@ -186,6 +186,20 @@
       <span class="spacer"></span>
       <button value="cancel" formnovalidate>Cancel</button>
       <button value="save" class="primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Confirmation before a judge is removed from the gallery; the text is filled in by app.js -->
+<dialog id="judge-del-dlg">
+  <form method="dialog" class="dlg-box">
+    <h3>Delete judge?</h3>
+    <p id="jd-text"></p>
+    <ul class="jd-list" id="jd-list"></ul>
+    <div class="crop-actions">
+      <span class="spacer"></span>
+      <button value="cancel" autofocus>Cancel</button>
+      <button value="delete" class="danger-fill">Delete judge</button>
     </div>
   </form>
 </dialog>

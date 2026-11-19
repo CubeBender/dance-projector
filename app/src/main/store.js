@@ -26,9 +26,12 @@ const DEFAULT_CONFIG = {
   outputPort: 8787,
   outputHost: '0.0.0.0',
   slots: {
-    A: { competitionId: null, follow: false, label: 'Levá strana', labelEn: 'Left side', color: '#1E7BFF' },
-    B: { competitionId: null, follow: false, label: 'Pravá strana', labelEn: 'Right side', color: '#FF3B4E' },
+    // source: 'dans' = a competition from the DanS list, 'manual' = own selection from the gallery (D-19)
+    A: { source: 'dans', competitionId: null, follow: false, label: 'Levá strana', labelEn: 'Left side', color: '#1E7BFF' },
+    B: { source: 'dans', competitionId: null, follow: false, label: 'Pravá strana', labelEn: 'Right side', color: '#FF3B4E' },
   },
+  // Own selections per side: { number, title, titleEn, round, judges: [{ fedId, letter }] } – see view.js manualCompetition
+  manualPanels: { A: { judges: [] }, B: { judges: [] } },
   split: false,          // floor split in two halves (only sometimes, for small competitions)
   // wholeColor: older setting for the whole-floor accent; now the style's accent (theme.js) and only read from old configs
   language: { primary: 'cs', secondary: 'en' }, // secondary: 'en' | 'cs' | 'none'
@@ -211,6 +214,15 @@ class Store {
   setPhotoCrop(fedId, file, crop) {
     const cur = this.judge(fedId);
     this.updateJudge(fedId, { photos: (cur.photos || []).map((p) => (p.file === file ? { ...p, crop } : p)) });
+  }
+
+  // Removes a judge from the gallery (names, photo list) and from the own selections. The photo files go in the
+  // next cleanupFiles(), so the projection keeps its images until the next push.
+  deleteJudge(fedId) {
+    delete this.judges.data[fedId];
+    this.judges.save();
+    for (const m of Object.values(this.cfg.manualPanels || {})) m.judges = (m.judges || []).filter((j) => j.fedId !== fedId);
+    this.config.save();
   }
 
   // Older single-photo calls, kept for existing callers: replace = add as main; remove = delete the main photo.

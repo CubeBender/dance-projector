@@ -53,7 +53,7 @@ function half(slot, i) {
   const r = comp.round;
   const dance = r?.dances?.[r.currentDance];
   el.append(
-    h('div', { class: 'num' }, h('div', { class: 'card' }, comp.number)),
+    comp.number != null ? h('div', { class: 'num' }, h('div', { class: 'card' }, comp.number)) : null, // own selection may have no number
     h('div', { class: 'info' },
       h('div', { class: 't' }, bi(L.title(comp))),
       r ? h('div', { class: 'r' }, bi(roundLine(r))) : null),

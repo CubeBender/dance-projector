@@ -66,6 +66,13 @@ Claude's decision log. Questions that need the user are asked in the conversatio
 - **Also (user):** comment the code more, the user reviews it.
 
 
+### D-19 Judge selection without DanS; deleting judges
+- **Asked by the user (2026-11-19):** show a judge selection even without a connection to DanS, using the judge gallery and a judge selection page; allow deleting judges from the gallery with a confirmation window.
+- **Decision:** the Judge panel tab becomes **Judge selection**. Each screen side chooses **From DanS** (as before) or **Own selection**: judges picked from the gallery with letters A, B, C… given automatically and editable, plus an optional competition number, title (two languages) and round typed by hand. It needs no DanS data and no event, and goes through Push like everything else. **Delete judge…** on gallery cards asks in a window that lists what is removed.
+- **Changes D-14:** manual work no longer depends on a judge list read from DanS ahead; the gallery is enough.
+
+## Claude's decisions
+
 ### C-01 Technology: Electron with plain JavaScript, no framework or build step
 - **Why:** few dependencies, easy to adjust on the day, nothing to compile.
 
@@ -166,6 +173,10 @@ Claude's decision log. Questions that need the user are asked in the conversatio
 - **Context (2026-11-19):** the user reported photos shown rotated and one photo that would not import. Cause: phone photos stored sideways with an EXIF orientation tag (Electron's nativeImage ignores it), and one JPEG missing its last bytes (nativeImage refuses it).
 - **Decision:** all images are re-encoded by Chromium's decoder in a hidden window (`imagedecode.js`), which applies EXIF orientation; a JPEG without its end marker gets one appended on a temporary copy, so the data that is there decodes. Photos made this way carry `enc: 2`; importing the same folder again redoes older photos from their originals (keeping place, main status and crop). The Adjust photo window also has ↺ / ↻ buttons that write a turned copy and reset the framing. (The user asked for either a fix or a rotate option; both were done.)
 - **Why:** fixes existing galleries with one click on Import folder…, and still lets the operator correct any photo whose orientation tag is wrong.
+
+### C-26 Own selection details
+- **Decision:** stored in config (`slots.X.source`, `manualPanels.X = { number, title, titleEn, round, judges: [{ fedId, letter }] }`), not per event, because it is independent of DanS. Pressing Show on a DanS competition switches that side back to DanS; "follow running" never replaces an own selection. Letters are cleaned to A–Z/0–9, max 3; a duplicate letter is pointed out. On screen the header shows only what was typed and disappears when nothing was. Judge cards now take first name / surname from the gallery fields (so double surnames stay together) unless a name on screen is typed. Deleting a judge also removes them from own selections; their photo files stay until the next push.
+- **Why:** works on the event day with DanS unreachable, with the same review-and-push routine.
 
 ## Changes
 

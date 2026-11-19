@@ -21,8 +21,8 @@ Options: `--data=<folder>` uses a separate settings folder, `--devtools` opens t
 3. Choose the event.
 4. In **Competitions**, press **Show** on a row to put it on screen. Running competitions (judging enabled) are green and listed first.
 5. When the floor is split, tick **Floor is split in two halves**. Rows then get **A** and **B** buttons, and each side gets a Czech and English name and a colour matching the lighting.
-6. In **Judge panel**, check the panel from DanS or click judges to pick it by hand. **Use DanS panel** undoes your edits.
-7. In **Judges** (the gallery, kept between events), press **Import folder…** to bring in photos named `IDT_Surname_Name[ Number].jpg`, for example from `Docs/judges` (importing again only adds new photos). Edit name and surname, click a small photo to make it the main one, × twice to delete it, + to add more. Click the big photo to adjust its framing.
+6. In **Judge selection**, choose per side: **From DanS** (check the panel of the competition shown, or click judges to change it; **Use DanS panel** undoes your edits) or **Own selection** (pick judges from the gallery, letters A, B, C… are given and can be changed, optionally type the competition number and title). Own selection works without any DanS connection.
+7. In **Judges** (the gallery, kept between events), press **Import folder…** to bring in photos named `IDT_Surname_Name[ Number].jpg`, for example from `Docs/judges` (importing again only adds new photos). Edit name and surname, click a small photo to make it the main one, × twice to delete it, + to add more. Click the big photo to adjust its framing. **Delete judge…** removes a judge from the gallery after asking.
 8. In **Style**, set this event's colours and background (moving lights, solid colour or an image).
 9. Nothing reaches the screen until you press **Push to projection** in the side panel. The two previews show what you prepared and what is on screen; the line above the button lists what is not pushed yet.
 10. Under **On-screen text**, choose the main language and the second language.

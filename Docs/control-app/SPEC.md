@@ -30,12 +30,15 @@ Electron desktop app for the operator. Top bar, four tabs (Competitions, Judge p
 - Crop (focus point and zoom, frame matches the judge card) is stored per photo. The Adjust photo window can also turn the photo 90° left or right (↺ / ↻); this writes a turned copy and resets the framing.
 - Images are decoded by Chromium (hidden window, `imagedecode.js`): EXIF orientation is applied and JPEGs missing their last bytes still import (decision C-25). Importing a folder again redoes photos imported by older versions from their originals.
 - **Import folder…** reads files named `IDT_Surname_Name[ Number].jpg|jpeg|png|webp` (default folder `Docs/judges`, which is git-ignored). New judges get the names from the file name; names already in the gallery are kept. Photos already imported (same file content, SHA-1) are skipped, so a folder can be imported again after adding photos. The report lists added, skipped, unrecognised and unreadable files.
-- **New judge…** adds a judge by IDT, name and surname.
+- **New judge…** adds a judge by IDT, name and surname. **Delete judge…** (gallery cards) asks in a window listing what goes: photos, names, the place in own selections; a judge from the DanS event stays listed without photos.
 - Filters: all, in this event, on screen now, without photo; search by IDT or name.
 - Photos are re-encoded (baseline JPEG, max 900 px) into `<userData>/photos/`; the gallery is `<userData>/judges.json` (shape in `app/src/main/gallery.js`; older single-photo entries are converted on load). Deleted photos stay on disk until the next push or start, so the screen never loses an image it still shows.
 - On screen: gallery names win over DanS; Name on screen wins over both; the main photo with its crop.
 
-## 4b. Judge panel (D-13, D-14)
+## 4b. Judge selection (D-13, D-14, D-19)
+- One block per screen side (A, and B on a split floor) with a source switch: **From DanS** or **Own selection**.
+- **Own selection** (no DanS needed): optional No., competition title in both languages and round; the chosen judges as rows with an editable letter (A, B, C… given in order of clicking, gaps filled; A–Z/0–9, max 3; a letter used twice is pointed out) and ×; the gallery below as toggle buttons with a search box. Stored in `config.json` (`slots.X.source`, `manualPanels.X`). Pressing **Show** on a DanS competition switches the side back to From DanS.
+- **From DanS:**
 - One block per competition on screen (A, and B on a split floor): title, round, where the panel comes from (**Panel from DanS**, **Picked by hand** with the difference to DanS, or **No panel yet**), number selected.
 - All judges of the event as toggle buttons (photo, letter, name). Judges in the DanS panel have a green ring on their letter.
 - Clicking edits the panel; the first edit of a DanS panel starts from the DanS list. **Use DanS panel** forgets the edit; **Clear** empties the panel.

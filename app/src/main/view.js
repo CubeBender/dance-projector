@@ -23,6 +23,9 @@ function judgeView(j, store) {
     letter: j.letter,
     name: g.displayName || `${first} ${last}`.trim(),
     firstName: first, surname: last,
+    // the two lines of the judge card: small first name, large surname. Without a typed "name on screen" they
+    // come straight from the name fields, so a double surname ("Malá Veselá") stays together.
+    lines: g.displayName ? null : [first, last],
     country: j.country && j.country !== 'CZE' ? j.country : '',
     photo: portrait ? `/photos/${encodeURIComponent(portrait.file)}` : null,
     crop: cleanCrop(portrait?.crop),
@@ -30,6 +33,24 @@ function judgeView(j, store) {
 }
 
 // theme: the event's style; its accent colours the slot when the whole floor is one competition.
+// Own selection (decision D-19): judges picked from the gallery with letters set by the operator, and an optional
+// competition number / title / round typed by hand. Built from the gallery and config only, so it works with no
+// DanS connection and no event. Judges deleted from the gallery drop out.
+function manualCompetition(key, store) {
+  const m = store.cfg.manualPanels?.[key] || {};
+  const judges = (m.judges || [])
+    .filter((j) => Object.keys(store.judge(j.fedId)).length)
+    .map((j) => judgeView({ fedId: j.fedId, letter: j.letter || '' }, store))
+    .sort((a, b) => a.letter.localeCompare(b.letter, 'cs'));
+  return {
+    id: `manual-${key}`, manual: true,
+    number: m.number || null, title: m.title || '', titleEn: m.titleEn || '', titleShort: '',
+    state: null, running: false,
+    round: m.round ? { name: m.round, competes: null, advances: null, currentDance: -1, dances: [] } : null,
+    judges,
+  };
+}
+
 function slotView(key, model, raw, store, theme) {
   const s = store.cfg.slots[key];
   const split = !!store.cfg.split;
@@ -38,7 +59,8 @@ function slotView(key, model, raw, store, theme) {
     ? { key, label: s.label, labelEn: s.labelEn, color: s.color, competition: null }
     : { key, label: '', labelEn: '', color: theme.accent, competition: null };
   if (!split && key !== 'A') return base;
-  const comp = model.competitions.find((c) => c.id === s.competitionId) || null;
+  if (s.source === 'manual') return { ...base, competition: manualCompetition(key, store) };
+  const comp = model?.competitions.find((c) => c.id === s.competitionId) || null;
   if (!comp) return base;
   const heats = comp.round ? buildHeats(model, comp, raw.draws?.[comp.round.id]) : null;
   const cur = comp.round?.currentDance ?? -1;
@@ -86,7 +108,8 @@ function outputState(model, raw, store, status) {
     split: !!store.cfg.split,
     language: store.cfg.language,
     heatsShow: store.cfg.heatsShow,
-    slots: model ? { A: slotView('A', model, raw, store, theme), B: slotView('B', model, raw, store, theme) } : {},
+    // computed even without DanS data: an own selection needs none
+    slots: { A: slotView('A', model, raw, store, theme), B: slotView('B', model, raw, store, theme) },
   };
 }
 

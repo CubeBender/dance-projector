@@ -63,7 +63,7 @@ function render(state) {
       h('div', { class: 'panel-title caps enter', '--i': 1 }, bi(L.t('judges'), 'inline'), h('span', { class: 'count' }, `· ${judges.length}`)),
       h('div', { class: 'judges', style: { gridTemplateColumns: `repeat(${lay.cols}, var(--w))` }, '--w': lay.w + 'px' },
         judges.map((j, i) => {
-          const [first, last] = split(j.name);
+          const [first, last] = j.lines || split(j.name); // own name fields, or split the typed name on screen
           return h('article', { class: 'judge enter', '--i': i + 2 },
             j.photo ? h('div', { class: 'photo' }, photo(j.photo, j.crop))
                     : h('div', { class: 'photo none' }, h('span', { class: 'initials' }, initials(j))),

@@ -20,7 +20,7 @@ const { buildModel } = require('./model');
 const { Store, normalizeServer } = require('./store');
 const { OutputServer } = require('./server');
 const { Projection } = require('./projection');
-const { applyPanels, togglePanel } = require('./panels');
+const { applyPanels, togglePanel, toggleManual, cleanLetter } = require('./panels');
 const { cleanTheme, themeFor, themeKey } = require('./theme');
 const { outputState, judgeView, cleanCrop } = require('./view');
 const { sortForImport, mainPhoto } = require('./gallery');
@@ -169,7 +169,7 @@ function applyFollow() {
   let changed = false;
   for (const key of store.cfg.split ? ['A', 'B'] : ['A']) {
     const s = store.cfg.slots[key];
-    if (!s.follow) continue;
+    if (!s.follow || s.source === 'manual') continue; // an own selection is never replaced automatically
     const other = store.cfg.slots[key === 'A' ? 'B' : 'A'].competitionId;
     const mine = model.competitions.find((c) => c.id === s.competitionId);
     if (mine?.running) continue;
@@ -195,8 +195,13 @@ function rebuild() {
 
 function rendererState() {
   const slotIds = Object.values(store.cfg.slots).map((s) => s.competitionId);
+  // judges on screen: DanS person ids of competitions in a slot, and IDTs of the own selections in use
   const inSlots = new Set();
   model?.competitions.filter((c) => slotIds.includes(c.id)).forEach((c) => c.judges.forEach((j) => inSlots.add(j.personId)));
+  const manualOnScreen = new Set();
+  for (const k of store.cfg.split ? ['A', 'B'] : ['A']) {
+    if (store.cfg.slots[k].source === 'manual') for (const j of store.cfg.manualPanels?.[k]?.judges || []) manualOnScreen.add(j.fedId);
+  }
   const base = outputAddr ? `http://localhost:${outputAddr.port}` : null;
   const theme = themeFor(store.cfg, store.cfg.eventId);
   return {
@@ -221,7 +226,7 @@ function rendererState() {
       // displayName = the name as the projection shows it (gallery names and name on screen win over DanS)
       return { ...j, displayName: v.name, photo: v.photo && base ? base + v.photo : null, crop: v.crop, inSlots: inSlots.has(j.personId) };
     }).sort((a, b) => a.letter.localeCompare(b.letter, 'cs')),
-    gallery: galleryView(base, inSlots),
+    gallery: galleryView(base, inSlots, manualOnScreen),
     theme: { ...theme, imageUrl: theme.image && base ? `${base}/media/${encodeURIComponent(theme.image)}` : null },
     projection: { auto: projection.auto, changes: projection.changes(), pushedAt: projection.pushedAt },
     outputs: outputAddr ? {
@@ -243,7 +248,7 @@ function rendererState() {
 
 // The Judges tab: every judge in the gallery plus every judge of the current event (even without a gallery
 // entry yet), with all photos. DanS names are shown as hints next to the editable gallery names.
-function galleryView(base, inSlots) {
+function galleryView(base, inSlots, manualOnScreen = new Set()) {
   const byId = new Map();
   for (const [fedId, g] of store.galleryEntries()) byId.set(fedId, { fedId, g, dans: null, inGallery: true });
   for (const j of model?.judges.values() || []) {
@@ -256,7 +261,7 @@ function galleryView(base, inSlots) {
     fedId, inGallery,
     name: g.name || '', surname: g.surname || '', displayName: g.displayName || '',
     dansName: dans?.name || '', dansSurname: dans?.surname || '',
-    letter: dans?.letter || '', inEvent: !!dans, inSlots: !!dans && inSlots.has(dans.personId),
+    letter: dans?.letter || '', inEvent: !!dans, inSlots: (!!dans && inSlots.has(dans.personId)) || manualOnScreen.has(fedId),
     main: mainPhoto(g)?.file || null,
     photos: (g.photos || []).map((p) => ({ file: p.file, url: url(p.file), crop: cleanCrop(p.crop) })),
   })).sort((a, b) => (a.surname || a.dansSurname).localeCompare(b.surname || b.dansSurname, 'cs'));
@@ -327,6 +332,7 @@ function setupIpc() {
     const other = store.cfg.slots[slot === 'A' ? 'B' : 'A'];
     s.competitionId = s.competitionId === compId ? null : compId;
     if (s.competitionId && other.competitionId === compId) other.competitionId = null;
+    if (s.competitionId) s.source = 'dans'; // pressing Show on a DanS competition switches this side back to DanS
     store.config.save(); rebuild(); return rendererState();
   });
   ipcMain.handle('set-slot', (_e, slot, patch) => {
@@ -345,6 +351,41 @@ function setupIpc() {
   });
   ipcMain.handle('panel-reset', (_e, compId) => { store.setPanel(store.cfg.eventId, compId, null); rebuild(); return rendererState(); });
   ipcMain.handle('panel-clear', (_e, compId) => { store.setPanel(store.cfg.eventId, compId, []); rebuild(); return rendererState(); });
+
+  // ---- own selections without DanS (D-19, view.js manualCompetition) ----
+  const manual = (slot) => (store.cfg.manualPanels[slot] ||= { judges: [] });
+  const validSlot = (slot) => slot === 'A' || slot === 'B';
+  // which source a side shows: 'dans' (competition from the list) or 'manual' (own selection)
+  ipcMain.handle('set-slot-source', (_e, slot, source) => {
+    if (validSlot(slot) && ['dans', 'manual'].includes(source)) store.updateConfig({ slots: { [slot]: { source } } });
+    rebuild(); return rendererState();
+  });
+  // competition details typed by hand; all optional, empty text removes the field
+  ipcMain.handle('manual-update', (_e, slot, patch) => {
+    if (!validSlot(slot)) return rendererState();
+    const m = manual(slot);
+    for (const k of ['number', 'title', 'titleEn', 'round']) {
+      if (!(k in patch)) continue;
+      const v = String(patch[k] ?? '').trim().slice(0, 120);
+      if (v) m[k] = v; else delete m[k];
+    }
+    store.config.save(); rebuild(); return rendererState();
+  });
+  ipcMain.handle('manual-toggle', (_e, slot, fedId) => {
+    if (!validSlot(slot) || !fedId) return rendererState();
+    manual(slot).judges = toggleManual(manual(slot).judges, String(fedId));
+    store.config.save(); rebuild(); return rendererState();
+  });
+  ipcMain.handle('manual-letter', (_e, slot, fedId, letter) => {
+    if (!validSlot(slot)) return rendererState();
+    const l = cleanLetter(letter);
+    manual(slot).judges = manual(slot).judges.map((j) => (j.fedId === fedId && l ? { ...j, letter: l } : j));
+    store.config.save(); rebuild(); return rendererState();
+  });
+  ipcMain.handle('manual-clear', (_e, slot) => {
+    if (validSlot(slot)) { manual(slot).judges = []; store.config.save(); }
+    rebuild(); return rendererState();
+  });
 
   // ---- style of the current event (theme.js) ----
   const setTheme = (patch) => store.updateConfig({ themes: { [themeKey(store.cfg.eventId)]: cleanTheme(patch) } });
@@ -419,6 +460,8 @@ function setupIpc() {
   });
   ipcMain.handle('judge-photo-main', (_e, fedId, file) => { store.setMainPhoto(fedId, file); rebuild(); return rendererState(); });
   ipcMain.handle('judge-photo-delete', (_e, fedId, file) => { store.deletePhoto(fedId, file); rebuild(); return rendererState(); });
+  // Delete a whole judge from the gallery (the window asks for confirmation first)
+  ipcMain.handle('judge-delete', (_e, fedId) => { if (fedId) store.deleteJudge(String(fedId)); rebuild(); return rendererState(); });
   // Turn a photo by ±90 degrees from the Adjust photo window. Returns the new state and the new file name,
   // so the open window can switch to the turned photo.
   ipcMain.handle('judge-photo-rotate', async (_e, fedId, file, degrees) => {
