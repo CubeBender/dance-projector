@@ -34,7 +34,7 @@ assert.deepStrictEqual(s.judge('10000009').photos, [{ file: 'old.jpg', crop: nul
 const src = path.join(dir, 'p.jpg'); fs.writeFileSync(src, 'jpeg');
 s.ensureJudge('10000001', { name: 'Jana', surname: 'Nováková' });
 const a = s.addPhoto('10000001', src, { hash: 'h1' });
-const b = s.addPhoto('10000001', src, { hash: 'h2' });
+let b = s.addPhoto('10000001', src, { hash: 'h2' });
 assert.strictEqual(s.judge('10000001').main, a, 'first photo becomes main');
 assert.ok(s.hasPhotoHash('10000001', 'h2') && !s.hasPhotoHash('10000001', 'h3'));
 s.setMainPhoto('10000001', b);
@@ -47,6 +47,17 @@ assert.strictEqual(v.name, 'Jana Nováková', 'gallery spelling wins over DanS')
 assert.ok(v.photo.endsWith(b)); assert.deepStrictEqual(v.crop, { x: 40, y: 20, zoom: 2 });
 s.updateJudge('10000001', { displayName: 'Ing. Jana Nováková' });
 assert.strictEqual(judgeView({ fedId: '10000001', letter: 'C' }, s).name, 'Ing. Jana Nováková');
+// replacing a photo's file (re-encode / rotate) keeps its place, main status and hash; rotate resets the crop
+assert.strictEqual(s.photoByHash('10000001', 'h2').file, b);
+const b2 = s.replacePhotoFile('10000001', b, src, { resetCrop: true, enc: 2 });
+assert.notStrictEqual(b2, b, 'new file name');
+assert.strictEqual(s.judge('10000001').main, b2, 'still the main photo');
+assert.deepStrictEqual(s.photoByHash('10000001', 'h2'), { file: b2, hash: 'h2', crop: null, enc: 2 });
+assert.throws(() => s.replacePhotoFile('10000001', 'nope.jpg', src), /not found/);
+s.setPhotoCrop('10000001', b2, { x: 40, y: 20, zoom: 2 });
+const b3 = s.replacePhotoFile('10000001', b2, src, { enc: 2 });
+assert.deepStrictEqual(s.photoByHash('10000001', 'h2').crop, { x: 40, y: 20, zoom: 2 }, 'crop kept when not asked to reset');
+b = b3; // the rest of the test works with the current file of the second photo
 // deleting the main photo makes the remaining one main; the file stays until cleanup
 s.deletePhoto('10000001', b);
 assert.strictEqual(s.judge('10000001').main, a);

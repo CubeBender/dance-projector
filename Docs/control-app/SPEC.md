@@ -27,7 +27,8 @@ Electron desktop app for the operator. Top bar, four tabs (Competitions, Judge p
 ## 4. Judges – the gallery (decision D-18)
 - A gallery kept between events, one entry per judge **IDT** (the federation id DanS reports). The tab lists every gallery judge plus the current event's judges (marked "In this event"; "Not in gallery yet" until something is saved).
 - Each card: main portrait (click = crop editor; drop an image = add it as the new main photo), IDT, letter at this event, editable **Name** and **Surname** (DanS names as placeholders; a note when DanS spells them differently), optional **Name on screen** (e.g. with a title), and a strip of all photos: click = make main, × then "Delete?" = delete, + or drop = add photos.
-- Crop (focus point and zoom, frame matches the judge card) is stored per photo.
+- Crop (focus point and zoom, frame matches the judge card) is stored per photo. The Adjust photo window can also turn the photo 90° left or right (↺ / ↻); this writes a turned copy and resets the framing.
+- Images are decoded by Chromium (hidden window, `imagedecode.js`): EXIF orientation is applied and JPEGs missing their last bytes still import (decision C-25). Importing a folder again redoes photos imported by older versions from their originals.
 - **Import folder…** reads files named `IDT_Surname_Name[ Number].jpg|jpeg|png|webp` (default folder `Docs/judges`, which is git-ignored). New judges get the names from the file name; names already in the gallery are kept. Photos already imported (same file content, SHA-1) are skipped, so a folder can be imported again after adding photos. The report lists added, skipped, unrecognised and unreadable files.
 - **New judge…** adds a judge by IDT, name and surname.
 - Filters: all, in this event, on screen now, without photo; search by IDT or name.

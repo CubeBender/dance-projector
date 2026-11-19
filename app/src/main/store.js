@@ -168,15 +168,34 @@ class Store {
   // Copies an already re-encoded image into photos/ and adds it to the judge.
   // hash identifies the original file, so importing the same folder twice doesn't add duplicates.
   // makeMain: true = becomes the portrait; otherwise only the first photo becomes main automatically.
-  addPhoto(fedId, srcFile, { hash = null, makeMain = false } = {}) {
-    const name = `${String(fedId).replace(/[^\w-]/g, '_')}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.jpg`;
-    fs.copyFileSync(srcFile, path.join(this.photoDir, name));
+  // enc: version of the encoder that made the file (see ENCODER in main.js).
+  addPhoto(fedId, srcFile, { hash = null, makeMain = false, enc = null } = {}) {
+    const name = this.copyIntoPhotos(fedId, srcFile);
     const cur = this.judge(fedId);
-    const photos = [...(cur.photos || []), { file: name, hash, crop: null }];
+    const photos = [...(cur.photos || []), { file: name, hash, crop: null, ...(enc ? { enc } : {}) }];
     this.updateJudge(fedId, { photos, main: makeMain || !cur.main ? name : cur.main });
     return name;
   }
-  hasPhotoHash(fedId, hash) { return !!hash && (this.judge(fedId).photos || []).some((p) => p.hash === hash); }
+  // Unique file name per copy: a replaced photo never reuses a name, so nothing shows a stale cached image.
+  copyIntoPhotos(fedId, srcFile) {
+    const name = `${String(fedId).replace(/[^\w-]/g, '_')}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.jpg`;
+    fs.copyFileSync(srcFile, path.join(this.photoDir, name));
+    return name;
+  }
+  hasPhotoHash(fedId, hash) { return !!this.photoByHash(fedId, hash); }
+  photoByHash(fedId, hash) { return (hash && (this.judge(fedId).photos || []).find((p) => p.hash === hash)) || null; }
+
+  // Swaps the file behind one photo (re-encoded or turned) and keeps its place in the list, its "main" status
+  // and its hash. resetCrop: the old framing no longer fits (after turning). Returns the new file name.
+  replacePhotoFile(fedId, oldFile, srcFile, { resetCrop = false, enc = undefined } = {}) {
+    const cur = this.judge(fedId);
+    if (!(cur.photos || []).some((p) => p.file === oldFile)) throw new Error('photo not found');
+    const name = this.copyIntoPhotos(fedId, srcFile);
+    const photos = cur.photos.map((p) => (p.file !== oldFile ? p
+      : { ...p, file: name, ...(resetCrop ? { crop: null } : {}), ...(enc !== undefined ? { enc } : {}) }));
+    this.updateJudge(fedId, { photos, main: cur.main === oldFile ? name : cur.main });
+    return name; // the old file is removed by cleanupFiles() once nothing on screen uses it
+  }
 
   // Removes one photo from the judge. The file itself stays until cleanupFiles(), because the projection may
   // still show it until the next push. If it was the main photo, the next one becomes main.

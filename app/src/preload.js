@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld('dp', {
   judgePhotoMain: (fedId, file) => ipcRenderer.invoke('judge-photo-main', fedId, file),
   judgePhotoDelete: (fedId, file) => ipcRenderer.invoke('judge-photo-delete', fedId, file),
   judgeCrop: (fedId, crop, file) => ipcRenderer.invoke('judge-crop', fedId, crop, file),
+  judgePhotoRotate: (fedId, file, degrees) => ipcRenderer.invoke('judge-photo-rotate', fedId, file, degrees), // -> { state, file }
   galleryImport: (dir) => ipcRenderer.invoke('gallery-import', dir), // no dir = folder dialog
   openUrl: (url) => ipcRenderer.invoke('open-url', url),
   // pushed from the main process

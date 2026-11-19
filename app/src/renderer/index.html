@@ -165,6 +165,9 @@
     <div class="crop-frame" id="crop-frame"><img id="crop-img" alt=""><div class="crop-letter" id="crop-letter"></div></div>
     <label class="row">Zoom <input type="range" id="crop-zoom" min="1" max="4" step="0.01"></label>
     <div class="crop-actions">
+      <!-- Turning saves straight away (a new file); the framing is reset because it no longer fits -->
+      <button type="button" id="crop-rot-left" title="Turn the photo 90° to the left">↺</button>
+      <button type="button" id="crop-rot-right" title="Turn the photo 90° to the right">↻</button>
       <button type="button" id="crop-reset">Reset</button>
       <span class="spacer"></span>
       <button value="cancel">Cancel</button>

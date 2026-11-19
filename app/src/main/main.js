@@ -8,7 +8,8 @@
 //                                                       Push to projection ──> pushed ─┴─> output server ──> OBS
 //
 // The operator window never reaches DanS or the files itself; it asks this process through preload.js.
-const { app, BrowserWindow, ipcMain, dialog, shell, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { encodeImage, closeWorker } = require('./imagedecode');
 const fs = require('fs');
 const crypto = require('crypto');
 const os = require('os');
@@ -46,58 +47,74 @@ function lanAddresses() {
 // Images
 // ---------------------------------------------------------------------------------------------------------
 
-// Re-encode an image as a plain baseline JPEG, at most maxWidth wide. Some JPEGs (seen with a progressive
-// phone photo) display in Chrome but not in the OBS browser source; a fresh encode always works and keeps
-// files small.
-function normalizeImage(src, dest, maxWidth = 900) {
-  let img = nativeImage.createFromPath(src);
-  if (img.isEmpty()) throw new Error('could not be read – not a JPEG/PNG/WebP image, or the file is damaged or incomplete');
-  const { width } = img.getSize();
-  if (width > maxWidth) img = img.resize({ width: maxWidth, quality: 'best' });
-  fs.writeFileSync(dest, img.toJPEG(90));
-}
+// Every image is re-encoded as a plain baseline JPEG by imagedecode.js (Chromium's decoder in a hidden window):
+// some phone JPEGs don't show in the OBS browser source otherwise, EXIF orientation gets applied, and files cut
+// off at the end still import. ENCODER marks photos made this way; photos imported by older versions of the
+// app lack it and are redone from the original when the same folder is imported again.
+const ENCODER = 2;
 
 // SHA-1 of a file's bytes. Identifies an original photo, so importing the same folder again skips it.
 const fileHash = (file) => crypto.createHash('sha1').update(fs.readFileSync(file)).digest('hex');
+const tempJpeg = () => path.join(app.getPath('temp'), `dp-photo-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.jpg`);
 
 // Adds one image file to a judge's gallery: re-encode, copy into photos/, remember its hash.
-// Returns false when this exact file is already in the judge's gallery.
-function addJudgePhoto(fedId, file, { makeMain = false } = {}) {
+// Returns 'added', 'redone' (same original imported before by an older version: re-encoded in place, which
+// fixes photos that came out rotated) or 'skipped' (already in the gallery).
+async function addJudgePhoto(fedId, file, { makeMain = false } = {}) {
   const hash = fileHash(file);
-  if (store.hasPhotoHash(fedId, hash)) return false;
-  const tmp = path.join(app.getPath('temp'), `dp-photo-${Date.now()}.jpg`);
-  normalizeImage(file, tmp);
-  try { store.addPhoto(fedId, tmp, { hash, makeMain }); } finally { fs.rm(tmp, { force: true }, () => {}); }
-  return true;
+  const known = store.photoByHash(fedId, hash);
+  if (known && known.enc >= ENCODER) return 'skipped';
+  const tmp = tempJpeg();
+  try {
+    await encodeImage(file, tmp);
+    if (known) store.replacePhotoFile(fedId, known.file, tmp, { enc: ENCODER });
+    else store.addPhoto(fedId, tmp, { hash, makeMain, enc: ENCODER });
+  } finally { fs.rm(tmp, { force: true }, () => {}); }
+  return known ? 'redone' : 'added';
+}
+
+// Turns one stored photo by 90/180/270 degrees (Adjust photo window). The result is a new file, so the
+// projection keeps showing the old one until the next push. The framing is reset, because it no longer fits.
+// Returns the new file name.
+async function rotateJudgePhoto(fedId, file, degrees) {
+  const tmp = tempJpeg();
+  try {
+    // no downscaling: a portrait turned sideways is wider than the 900 px import limit and should stay sharp
+    await encodeImage(path.join(store.photoDir, file), tmp, { maxWidth: 4000, rotate: degrees });
+    return store.replacePhotoFile(fedId, file, tmp, { resetCrop: true });
+  } finally { fs.rm(tmp, { force: true }, () => {}); }
 }
 
 // Imports a folder of photos named "IDT_Surname_Name[ Number].ext" (gallery.js parseFileName).
 // New judges get the names from the file name; names already in the gallery are kept, because the operator
 // may have corrected them. Returns a report for the window.
-function importGalleryFolder(dir) {
-  const report = { added: 0, judges: new Set(), duplicates: 0, unrecognised: [], failed: [] };
+async function importGalleryFolder(dir) {
+  const report = { added: 0, redone: 0, judges: new Set(), duplicates: 0, unrecognised: [], failed: [] };
   const files = fs.readdirSync(dir, { withFileTypes: true }).filter((d) => d.isFile()).map((d) => ({ name: d.name }));
   for (const { f, info } of sortForImport(files)) {
     if (!info) { if (!f.name.startsWith('.')) report.unrecognised.push(f.name); continue; }
     try {
       store.ensureJudge(info.idt, { name: info.name, surname: info.surname });
-      if (addJudgePhoto(info.idt, path.join(dir, f.name))) { report.added++; report.judges.add(info.idt); } else report.duplicates++;
+      const result = await addJudgePhoto(info.idt, path.join(dir, f.name));
+      if (result === 'added') { report.added++; report.judges.add(info.idt); }
+      else if (result === 'redone') report.redone++;
+      else report.duplicates++;
     } catch (e) { report.failed.push(`${f.name}: ${e.message}`); }
   }
   return { ...report, judges: report.judges.size, folder: dir };
 }
 
-// One-time conversion of photos imported before normalisation existed (originals kept in photos-original).
-function normalizeExistingPhotos() {
+// One-time conversion of photos imported before any re-encoding existed (originals kept in photos-original).
+async function normalizeExistingPhotos() {
   for (const [fedId, j] of store.galleryEntries()) {
-    if (j.normalized !== undefined || !j.photos?.length) continue; // new imports are always re-encoded
+    if (j.normalized !== undefined || !j.photos?.length) continue; // everything imported since is re-encoded
     const keep = path.join(store.dir, 'photos-original');
     try {
       fs.mkdirSync(keep, { recursive: true });
       for (const p of j.photos) {
         const file = path.join(store.photoDir, p.file);
         if (!fs.existsSync(path.join(keep, p.file))) fs.copyFileSync(file, path.join(keep, p.file));
-        normalizeImage(file, file + '.tmp'); fs.renameSync(file + '.tmp', file);
+        await encodeImage(file, file + '.tmp'); fs.renameSync(file + '.tmp', file);
       }
       store.updateJudge(fedId, { normalized: true });
     } catch (e) { console.error('photo', fedId, e.message); }
@@ -342,7 +359,7 @@ function setupIpc() {
     }
     try {
       const name = `bg-${Date.now()}.jpg`;
-      normalizeImage(file, path.join(store.mediaDir, name), 1920); // full HD is all the projection needs
+      await encodeImage(file, path.join(store.mediaDir, name), { maxWidth: 1920 }); // full HD is all the projection needs
       setTheme({ image: name, background: 'image' });
     } catch (e) { dialog.showErrorBox('Background image', `This file could not be used: ${e.message}`); }
     rebuild(); return rendererState();
@@ -394,14 +411,22 @@ function setupIpc() {
     }
     store.ensureJudge(fedId);
     const failed = [];
-    files.forEach((f, i) => {
-      try { addJudgePhoto(fedId, f, { makeMain: makeMain && i === 0 }); } catch (e) { failed.push(`${path.basename(f)}: ${e.message}`); }
-    });
+    for (const [i, f] of files.entries()) {
+      try { await addJudgePhoto(fedId, f, { makeMain: makeMain && i === 0 }); } catch (e) { failed.push(`${path.basename(f)}: ${e.message}`); }
+    }
     if (failed.length) dialog.showErrorBox('Judge photos', `These files could not be used:\n${failed.join('\n')}`);
     rebuild(); return rendererState();
   });
   ipcMain.handle('judge-photo-main', (_e, fedId, file) => { store.setMainPhoto(fedId, file); rebuild(); return rendererState(); });
   ipcMain.handle('judge-photo-delete', (_e, fedId, file) => { store.deletePhoto(fedId, file); rebuild(); return rendererState(); });
+  // Turn a photo by ±90 degrees from the Adjust photo window. Returns the new state and the new file name,
+  // so the open window can switch to the turned photo.
+  ipcMain.handle('judge-photo-rotate', async (_e, fedId, file, degrees) => {
+    let newFile = null;
+    try { newFile = await rotateJudgePhoto(fedId, file, [90, -90, 180].includes(degrees) ? degrees : 90); }
+    catch (e) { dialog.showErrorBox('Rotate photo', `The photo could not be turned: ${e.message}`); }
+    rebuild(); return { state: rendererState(), file: newFile };
+  });
   // Crop of one photo; without a file name it is the main photo's.
   ipcMain.handle('judge-crop', (_e, fedId, crop, file) => {
     const target = file || mainPhoto(store.judge(fedId))?.file;
@@ -417,7 +442,7 @@ function setupIpc() {
       if (r.canceled || !r.filePaths[0]) return { state: rendererState(), report: null };
       dir = r.filePaths[0];
     }
-    const report = importGalleryFolder(dir);
+    const report = await importGalleryFolder(dir);
     rebuild();
     return { state: rendererState(), report };
   });
@@ -444,7 +469,7 @@ function migrateConfig() {
 async function start() {
   store = new Store(app.getPath('userData'));
   migrateConfig();
-  normalizeExistingPhotos();
+  await normalizeExistingPhotos();
   server = new OutputServer({
     outputsDir: path.join(__dirname, '..', 'outputs'),
     photoDir: store.photoDir,
@@ -477,6 +502,8 @@ async function start() {
     webPreferences: { preload: path.join(__dirname, '..', 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
   win.removeMenu();
+  // The hidden image decoder (imagedecode.js) is a window too; close it with the main window so the app quits.
+  win.on('closed', closeWorker);
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   if (process.argv.includes('--devtools')) win.webContents.openDevTools({ mode: 'detach' });
 

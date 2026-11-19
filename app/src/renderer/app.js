@@ -223,6 +223,18 @@ function openCrop(g, p) {
   frame.addEventListener('wheel', (e) => { e.preventDefault(); crop.c.zoom = Math.min(4, Math.max(1, crop.c.zoom * (e.deltaY < 0 ? 1.06 : 1 / 1.06))); showCrop(); }, { passive: false });
   $('#crop-zoom').addEventListener('input', (e) => { crop.c.zoom = +e.target.value; showCrop(); });
   $('#crop-reset').addEventListener('click', () => { crop.c = { x: 50, y: 30, zoom: 1 }; showCrop(); });
+  // Rotate: the main process writes a turned copy and returns its file name; the dialog switches to it.
+  const rotate = async (degrees) => {
+    for (const b of [$('#crop-rot-left'), $('#crop-rot-right')]) b.disabled = true; // one turn at a time
+    try {
+      const { state, file } = await window.dp.judgePhotoRotate(crop.fedId, crop.file, degrees);
+      apply(state);
+      const p = file && state.gallery.find((g) => g.fedId === crop.fedId)?.photos.find((x) => x.file === file);
+      if (p) { crop.file = p.file; crop.c = { x: 50, y: 30, zoom: 1 }; $('#crop-img').src = p.url; showCrop(); }
+    } finally { for (const b of [$('#crop-rot-left'), $('#crop-rot-right')]) b.disabled = false; }
+  };
+  $('#crop-rot-left').addEventListener('click', () => rotate(-90));
+  $('#crop-rot-right').addEventListener('click', () => rotate(90));
   // Saved from the form's submit, which fires at once (the dialog "close" event can arrive late).
   $('#crop form').addEventListener('submit', (e) => {
     if (e.submitter?.value === 'save' && crop.fedId) window.dp.judgeCrop(crop.fedId, crop.c, crop.file).then(apply);
@@ -326,6 +338,7 @@ function showImportReport(r) {
   el.hidden = false;
   el.replaceChildren(
     h('b', null, `Imported ${r.added} photo${r.added === 1 ? '' : 's'} for ${r.judges} judge${r.judges === 1 ? '' : 's'}.`),
+    r.redone ? ` ${r.redone} imported earlier were redone from the originals (fixes rotated photos).` : '',
     r.duplicates ? ` ${r.duplicates} already in the gallery, skipped.` : '',
     r.unrecognised.length ? h('div', null, `Not named "IDT_Surname_Name": ${r.unrecognised.join(', ')}`) : '',
     r.failed.length ? h('div', { class: 'err' }, `Could not read: ${r.failed.join('; ')}`) : '',

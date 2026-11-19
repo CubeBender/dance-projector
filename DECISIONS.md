@@ -162,6 +162,11 @@ Claude's decision log. Questions that need the user are asked in the conversatio
 - **Decision:** IDT = the federation id DanS gives as `in_authority_id` (same 8-digit numbers). Crop per photo. Import skips files already imported (SHA-1 of the original), keeps names already in the gallery, and reports unrecognised or unreadable files. Gallery names win over DanS on screen. Delete asks with a second click on the photo instead of a dialog. `Docs/judges/` is git-ignored and blocked by the pre-commit hook.
 - **Why:** re-importing the folder after adding photos must be safe; the operator's corrections must survive; photos of real people must never reach the public repository.
 
+### C-25 Images decoded by Chromium, rotate buttons
+- **Context (2026-11-19):** the user reported photos shown rotated and one photo that would not import. Cause: phone photos stored sideways with an EXIF orientation tag (Electron's nativeImage ignores it), and one JPEG missing its last bytes (nativeImage refuses it).
+- **Decision:** all images are re-encoded by Chromium's decoder in a hidden window (`imagedecode.js`), which applies EXIF orientation; a JPEG without its end marker gets one appended on a temporary copy, so the data that is there decodes. Photos made this way carry `enc: 2`; importing the same folder again redoes older photos from their originals (keeping place, main status and crop). The Adjust photo window also has ↺ / ↻ buttons that write a turned copy and reset the framing. (The user asked for either a fix or a rotate option; both were done.)
+- **Why:** fixes existing galleries with one click on Import folder…, and still lets the operator correct any photo whose orientation tag is wrong.
+
 ## Changes
 
 - **2026-10-17 – how this file is used.** Before: open questions were listed here as "Pending" for the user to go through. After: questions are asked in the conversation and only recorded here. **Reason:** the user clarified the file is for Claude to keep track. Former P-03 became D-06 (verified); P-06, P-08 and P-10 were asked and became D-07–D-09 and C-07; P-01, P-02, P-04, P-05, P-07, P-09 became Claude's decisions C-01–C-06.
