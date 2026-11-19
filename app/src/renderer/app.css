@@ -188,3 +188,29 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .bg-image { display: grid; gap: 8px; margin-bottom: 16px; }
 .bg-thumb { height: 170px; border-radius: 8px; border: 1px dashed #333b48; background: #0b0d11 center / cover no-repeat; display: flex; align-items: center; justify-content: center; color: var(--muted); cursor: pointer; }
 .bg-thumb.drag { border-color: var(--accent); }
+
+/* ---- Judges tab: gallery (overrides the older single-photo card above) ---- */
+.tools .spacer { flex: 1; }
+#jsearch { width: 200px; }
+.tools .sub { color: var(--muted); font-size: 12.5px; }
+.judges { grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); }
+.judge { grid-template-columns: 120px 1fr; }
+.judge .ph { width: 120px; height: 160px; }          /* main portrait, 3:4 like the card on screen */
+.names { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.tag { display: inline-block; margin-left: 8px; font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--panel-2); color: var(--muted); }
+.tag.ev { color: var(--run); background: rgba(47,214,123,0.10); }
+.tag.new { color: var(--warn); background: rgba(255,181,71,0.12); }
+/* photo strip: every photo of the judge; the main one is outlined */
+.strip { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px; margin: 0 -4px; border-radius: 8px; border: 1px dashed transparent; }
+.strip.drag { border-color: var(--accent); background: rgba(76,141,255,0.08); }
+.thumb { position: relative; width: 45px; height: 60px; }
+.thumb-img { position: relative; width: 100%; height: 100%; padding: 0; overflow: hidden; border-radius: 5px; border: 2px solid transparent; background: #0b0d11; }
+.thumb-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.thumb.main .thumb-img { border-color: var(--accent); }
+.thumb-del { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; font-size: 12px; line-height: 1; background: #2a303b; opacity: 0; }
+.thumb:hover .thumb-del, .thumb-del:focus-visible, .thumb-del.armed { opacity: 1; }
+/* armed: a red layer over the whole thumbnail (and over the corner where the × was), so the confirming click cannot miss */
+.thumb-del.armed { top: -6px; right: -6px; left: 0; bottom: 0; width: auto; height: auto; border-radius: 5px; background: rgba(255,93,108,0.92); border-color: var(--err); color: #fff; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.thumb-add { width: 45px; height: 60px; padding: 0; font-size: 22px; color: var(--muted); border-style: dashed; }
+.import-report { background: var(--panel-2); border: 1px solid var(--line); border-left: 4px solid var(--run); border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; display: grid; gap: 4px; justify-items: start; }
+.err { color: var(--err); font-size: 12.5px; margin: 0; }

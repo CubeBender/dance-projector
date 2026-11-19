@@ -4,7 +4,7 @@
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 let S = null;
-let filter = 'all', jfilter = 'all', search = '';
+let filter = 'all', jfilter = 'all', search = '', jsearch = ''; // list filters of the Competitions and Judges tabs
 const DONE = new Set(['Completed', 'Closed', 'Cancelled', 'Finished']);
 
 function h(tag, attrs, ...kids) {
@@ -189,18 +189,22 @@ function cropImg(url, c) {
 }
 
 // ---- crop editor ----
-const crop = { fedId: null, c: null };
+// Edits the framing of one photo of one judge. crop.c = { x, y } focus point in percent and zoom 1–4.
+// It is saved for that photo only, so each photo of a judge keeps its own framing.
+const crop = { fedId: null, file: null, c: null };
 function showCrop() {
   const img = $('#crop-img'), c = crop.c;
   Object.assign(img.style, { objectPosition: `${c.x}% ${c.y}%`, transformOrigin: `${c.x}% ${c.y}%`, transform: `scale(${c.zoom})` });
   $('#crop-zoom').value = c.zoom;
 }
-function openCrop(j) {
-  crop.fedId = j.fedId;
-  crop.c = { ...(j.crop || { x: 50, y: 30, zoom: 1 }) };
-  $('#crop-title').textContent = `Adjust photo – ${j.letter} ${j.name} ${j.surname}`;
-  $('#crop-letter').textContent = j.letter || '';
-  $('#crop-img').src = j.photo;
+// g = gallery row (galleryView in main.js), p = one of its photos
+function openCrop(g, p) {
+  crop.fedId = g.fedId;
+  crop.file = p.file;
+  crop.c = { ...(p.crop || { x: 50, y: 30, zoom: 1 }) };
+  $('#crop-title').textContent = `Adjust photo – ${judgeName(g)}`;
+  $('#crop-letter').textContent = g.letter || '';
+  $('#crop-img').src = p.url;
   showCrop();
   $('#crop').showModal();
 }
@@ -219,41 +223,113 @@ function openCrop(j) {
   frame.addEventListener('wheel', (e) => { e.preventDefault(); crop.c.zoom = Math.min(4, Math.max(1, crop.c.zoom * (e.deltaY < 0 ? 1.06 : 1 / 1.06))); showCrop(); }, { passive: false });
   $('#crop-zoom').addEventListener('input', (e) => { crop.c.zoom = +e.target.value; showCrop(); });
   $('#crop-reset').addEventListener('click', () => { crop.c = { x: 50, y: 30, zoom: 1 }; showCrop(); });
-  $('#crop').addEventListener('close', () => {
-    if ($('#crop').returnValue === 'save' && crop.fedId) window.dp.judgeCrop(crop.fedId, crop.c).then(apply);
+  // Saved from the form's submit, which fires at once (the dialog "close" event can arrive late).
+  $('#crop form').addEventListener('submit', (e) => {
+    if (e.submitter?.value === 'save' && crop.fedId) window.dp.judgeCrop(crop.fedId, crop.c, crop.file).then(apply);
   });
 })();
 
-function judgeCard(j) {
-  const ph = h('div', { class: 'ph' + (j.photo ? ' has' : ''), title: j.photo ? 'Click to adjust the crop, or drop an image to replace it' : 'Click to choose a photo, or drop an image here' },
-    j.photo ? cropImg(j.photo, j.crop) : 'Add photo');
-  ph.addEventListener('click', () => { if (!j.fedId) return; if (j.photo) openCrop(j); else window.dp.judgePhoto(j.fedId).then(apply); });
-  ph.addEventListener('dragover', (e) => { e.preventDefault(); ph.classList.add('drag'); });
-  ph.addEventListener('dragleave', () => ph.classList.remove('drag'));
-  ph.addEventListener('drop', (e) => { e.preventDefault(); ph.classList.remove('drag'); const f = e.dataTransfer.files[0]; if (f && j.fedId) window.dp.judgePhoto(j.fedId, f).then(apply); });
-  const input = h('input', { value: j.displayName, placeholder: `${j.name} ${j.surname}`, title: 'Name shown on screen. Leave empty to use the federation name.' });
-  input.addEventListener('change', () => window.dp.judgeName(j.fedId, input.value).then(apply));
-  return h('div', { class: 'judge' + (j.inSlots ? ' on' : '') },
+// ---- Judges tab: the gallery ----
+// One card per judge: everyone in the gallery plus the judges of the current event. The big photo is the main
+// portrait shown on screen. The strip below holds every photo: click a thumbnail to make it the main one,
+// × deletes it (it turns into "Delete?" first, so a stray click does not lose a photo), + adds photos.
+// Files can be dropped on the big photo (added as the new main photo) or on the strip (extra photos).
+const judgeName = (g) => `${g.name || g.dansName} ${g.surname || g.dansSurname}`.trim() || `IDT ${g.fedId}`;
+let armedDelete = null; // "fedId/file" of the thumbnail waiting for the confirming second click
+
+function dropZone(el, onFiles) {
+  el.addEventListener('dragover', (e) => { e.preventDefault(); el.classList.add('drag'); });
+  el.addEventListener('dragleave', () => el.classList.remove('drag'));
+  el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('drag'); if (e.dataTransfer.files.length) onFiles(e.dataTransfer.files); });
+}
+
+function judgeCard(g) {
+  const main = g.photos.find((p) => p.file === g.main) || null;
+  const ph = h('div', { class: 'ph' + (main ? ' has' : ''), title: main ? 'Click to adjust the framing. Drop an image here to add it as the main photo.' : 'Click to choose photos, or drop images here' },
+    main ? cropImg(main.url, main.crop) : 'Add photo');
+  ph.addEventListener('click', () => (main ? openCrop(g, main) : window.dp.judgePhotosAdd(g.fedId).then(apply)));
+  dropZone(ph, (files) => window.dp.judgePhotosAdd(g.fedId, files, true).then(apply));
+
+  // Editable names. Placeholders show the DanS names, so an empty field still says what will be used.
+  const field = (key, label, placeholder, title) => {
+    const input = h('input', { value: g[key], placeholder, title });
+    input.addEventListener('change', () => window.dp.judgeUpdate(g.fedId, { [key]: input.value }).then(apply));
+    return h('label', { class: 'stack' }, h('small', null, label), input);
+  };
+  // Point out when the gallery spelling differs from DanS (the gallery wins on screen)
+  const dansDiffers = g.inEvent && (g.name || g.surname) && `${g.name} ${g.surname}` !== `${g.dansName} ${g.dansSurname}`;
+
+  const thumbs = g.photos.map((p) => {
+    const key = `${g.fedId}/${p.file}`;
+    const armed = armedDelete === key;
+    return h('div', { class: 'thumb' + (p.file === g.main ? ' main' : '') },
+      h('button', { class: 'thumb-img', title: p.file === g.main ? 'Main photo (shown on screen)' : 'Make this the main photo',
+        onclick: () => window.dp.judgePhotoMain(g.fedId, p.file).then(apply) }, cropImg(p.url, p.crop)),
+      h('button', { class: 'thumb-del' + (armed ? ' armed' : ''), title: armed ? 'Click again to delete this photo' : 'Delete this photo',
+        onclick: (e) => {
+          const btn = e.currentTarget;
+          // Arm/disarm by changing this button in place (no redraw), so the second click hits the same button
+          const setArmed = (on) => { btn.classList.toggle('armed', on); btn.textContent = on ? 'Delete?' : '×'; btn.title = on ? 'Click again to delete this photo' : 'Delete this photo'; };
+          if (armedDelete !== key) {
+            armedDelete = key; setArmed(true);
+            setTimeout(() => { if (armedDelete === key) { armedDelete = null; setArmed(false); } }, 3000); // disarm after 3 s
+            return;
+          }
+          armedDelete = null; window.dp.judgePhotoDelete(g.fedId, p.file).then(apply);
+        } }, armed ? 'Delete?' : '×'));
+  });
+  const add = h('button', { class: 'thumb-add', title: 'Add photos (or drop them here)', onclick: () => window.dp.judgePhotosAdd(g.fedId).then(apply) }, '+');
+  const strip = h('div', { class: 'strip' }, thumbs, add);
+  dropZone(strip, (files) => window.dp.judgePhotosAdd(g.fedId, files).then(apply));
+
+  return h('div', { class: 'judge' + (g.inSlots ? ' on' : '') },
     ph,
     h('div', { class: 'jinfo' },
-      h('div', { class: 'jtop' }, h('span', { class: 'jletter' }, j.letter || '–'), h('span', { class: 'jname' }, `${j.name} ${j.surname}`)),
-      h('div', { class: 'jfed' }, `Federation ID ${j.fedId || '–'}${j.country ? ' · ' + j.country : ''}`),
-      h('label', { class: 'stack' }, h('small', null, 'Name on screen'), input),
-      j.photo ? h('div', { class: 'jactions' },
-        h('button', { onclick: () => openCrop(j) }, 'Adjust crop'),
-        h('button', { onclick: () => window.dp.judgePhoto(j.fedId).then(apply) }, 'Change photo'),
-        h('button', { onclick: () => window.dp.judgePhotoRemove(j.fedId).then(apply) }, 'Remove')) : null));
+      h('div', { class: 'jtop' },
+        g.letter ? h('span', { class: 'jletter', title: 'Judge letter at this event' }, g.letter) : null,
+        h('span', { class: 'jname' }, judgeName(g))),
+      h('div', { class: 'jfed' }, `IDT ${g.fedId}`,
+        g.inEvent ? h('span', { class: 'tag ev' }, 'In this event') : null,
+        g.inGallery ? null : h('span', { class: 'tag new' }, 'Not in gallery yet'),
+        g.photos.length > 1 ? h('span', { class: 'tag' }, `${g.photos.length} photos`) : null),
+      h('div', { class: 'names' },
+        field('name', 'Name', g.dansName, 'First name. Saved in the gallery and used at every event.'),
+        field('surname', 'Surname', g.dansSurname, 'Surname. Saved in the gallery and used at every event.')),
+      dansDiffers ? h('div', { class: 'jfed' }, `DanS has: ${g.dansName} ${g.dansSurname}`) : null,
+      field('displayName', 'Name on screen (optional)', `${g.name || g.dansName} ${g.surname || g.dansSurname}`.trim(),
+        'Replaces "Name Surname" on the projection, for example with a title. Leave empty to use the name and surname.'),
+      strip));
 }
 
 function renderJudges() {
-  let list = S.judges;
-  if (jfilter === 'slots') list = list.filter((j) => j.inSlots);
+  let list = S.gallery;
+  if (jfilter === 'event') list = list.filter((g) => g.inEvent);
+  if (jfilter === 'slots') list = list.filter((g) => g.inSlots);
+  if (jfilter === 'nophoto') list = list.filter((g) => !g.photos.length);
+  if (jsearch) {
+    const q = jsearch.toLowerCase();
+    list = list.filter((g) => g.fedId.includes(q) || [g.name, g.surname, g.displayName, g.dansName, g.dansSurname].join(' ').toLowerCase().includes(q));
+  }
   const wrap = $('#judges');
   if (wrap.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return; // don't steal focus while typing
   wrap.replaceChildren(...list.map(judgeCard));
+  $('#jcount').textContent = `${S.gallery.filter((g) => g.inGallery).length} in the gallery`;
   const empty = $('#judges-empty');
   empty.hidden = list.length > 0;
-  if (!list.length) empty.textContent = S.judges.length ? 'No judges in the competitions on screen.' : 'Choose an event to load its judges.';
+  if (!list.length) empty.textContent = !S.gallery.length ? 'The gallery is empty. Use Import folder… or New judge…, or choose an event to see its judges.' : 'No judge matches the filter.';
+}
+
+// Result of Import folder…, shown above the gallery until dismissed.
+function showImportReport(r) {
+  if (!r) return;
+  const el = $('#import-report');
+  el.hidden = false;
+  el.replaceChildren(
+    h('b', null, `Imported ${r.added} photo${r.added === 1 ? '' : 's'} for ${r.judges} judge${r.judges === 1 ? '' : 's'}.`),
+    r.duplicates ? ` ${r.duplicates} already in the gallery, skipped.` : '',
+    r.unrecognised.length ? h('div', null, `Not named "IDT_Surname_Name": ${r.unrecognised.join(', ')}`) : '',
+    r.failed.length ? h('div', { class: 'err' }, `Could not read: ${r.failed.join('; ')}`) : '',
+    h('button', { class: 'ghost', onclick: () => { el.hidden = true; } }, 'OK'));
 }
 
 function renderSettings() {
@@ -419,6 +495,26 @@ $('#refresh-events').addEventListener('click', () => window.dp.refreshEvents().t
 $('#search').addEventListener('input', (e) => { search = e.target.value.trim(); renderComps(); });
 $('#filter').addEventListener('click', (e) => { const b = e.target.closest('.chip'); if (!b) return; filter = b.dataset.f; $$('#filter .chip').forEach((x) => x.classList.toggle('active', x === b)); renderComps(); });
 $('#jfilter').addEventListener('click', (e) => { const b = e.target.closest('.chip'); if (!b) return; jfilter = b.dataset.f; $$('#jfilter .chip').forEach((x) => x.classList.toggle('active', x === b)); renderJudges(); });
+$('#jsearch').addEventListener('input', (e) => { jsearch = e.target.value.trim(); renderJudges(); });
+// Import folder…: the main process opens the folder dialog, imports and returns a report
+$('#gallery-import').addEventListener('click', async () => {
+  const { state, report } = await window.dp.galleryImport();
+  apply(state); showImportReport(report);
+});
+// New judge…: small dialog with IDT, name and surname
+$('#judge-new').addEventListener('click', () => {
+  for (const id of ['#nj-idt', '#nj-name', '#nj-surname']) $(id).value = '';
+  $('#nj-error').textContent = '';
+  $('#judge-dlg').showModal();
+  $('#nj-idt').focus();
+});
+$('#judge-dlg form').addEventListener('submit', async (e) => {
+  if (e.submitter?.value !== 'save') return;
+  e.preventDefault(); // keep the dialog open until the IDT is accepted
+  const st = await window.dp.judgeCreate({ fedId: $('#nj-idt').value, name: $('#nj-name').value, surname: $('#nj-surname').value });
+  if (st.error) { $('#nj-error').textContent = st.error; return; }
+  $('#judge-dlg').close(); apply(st);
+});
 $('#host').addEventListener('change', renderOutputs);
 $('#split').addEventListener('change', (e) => window.dp.setOption({ split: e.target.checked }).then(apply));
 $('#lang-primary').addEventListener('change', (e) => window.dp.setOption({ language: { primary: e.target.value, secondary: $('#lang-secondary').value } }).then(apply));

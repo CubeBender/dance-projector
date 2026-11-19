@@ -35,3 +35,9 @@
 > One potential workflow could look like this: The judge panel gets selected and printed in Dans. The list gets printed out to distribute. I can get a copy. I can eather select the panel manually, or I could show the list in front of the web cam and the program could read it and make the selection for me. Is that possible to do and reliable? There would be a human review OFC before this gets pushed to projection.
 >
 > What would be the pros and cons of rewriting this app in RUST?
+
+## 5. Judge gallery (2026-11-19)
+
+> I will be building a gallery of judges that I want to keep so I dont have to do it from scratch every time. Inside the Docs/judges folder, there are photos of judges named IDT Surname Name Number (optional). I want to keep a gallery of judges and save them inside of the app. Each judge is uniquelly identified by their IDT with Name and Surname editable (this should be in the app already). Some judges sent multiple photos. I want to keep all of them and select the main photo / portrait from these so I can change, add, remove etc later.
+
+> Also, comment your code more often, please, I am reviewing it and sometimes I have hard time following what is happening.

@@ -12,7 +12,7 @@ staged=$(git diff --cached --name-only --diff-filter=ACMR)
 [ -z "$staged" ] && exit 0
 
 # 1. Files that must never be committed
-bad_paths=$(printf '%s\n' "$staged" | grep -E '(^|/)(fixtures/private/|obs/backup-|obs/private/|photos/)|\.(db|db-wal|db-shm|sqlite|log|mp4|mov|avi|mkv|pem|key)$|(^|/)(judges|config)\.json$|(^|/)\.env' )
+bad_paths=$(printf '%s\n' "$staged" | grep -E '(^|/)(fixtures/private/|obs/backup-|obs/private/|photos/|Docs/judges/)|\.(db|db-wal|db-shm|sqlite|log|mp4|mov|avi|mkv|pem|key)$|(^|/)(judges|config)\.json$|(^|/)\.env' )
 if [ -n "$bad_paths" ]; then
   echo "pre-commit: these files contain or may contain private data:"; printf '  %s\n' $bad_paths; fail=1
 fi
@@ -31,6 +31,11 @@ check '[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z.]{2,}' 'e-mail address in staged
 check '[A-Z]:[\\/]+Users[\\/]+[A-Za-z0-9._-]+' 'personal Windows path (C:\Users\<name>) in staged changes'
 check '"pin" *: *"[0-9]+' 'judge PIN in staged changes'
 check '(password|passwd|secret|token|stream_?key|api_?key)"? *[:=] *"[^"]{6,}' 'possible secret in staged changes'
+# IDTs of real judges, taken from the local (git-ignored) photo folder: use made-up ids like 10000001 in code and docs
+if [ -d Docs/judges ]; then
+  ids=$(ls Docs/judges | grep -oE '^[0-9]{5,}' | sort -u | paste -sd'|' -)
+  [ -n "$ids" ] && check "(^|[^0-9])($ids)([^0-9]|\$)" 'IDT of a real judge (from Docs/judges) in staged changes'
+fi
 
 if [ "$fail" -ne 0 ]; then
   echo

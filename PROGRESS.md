@@ -26,6 +26,8 @@
 
 - 2026-11-19 **Revised workflow** (D-13 to D-16, C-18 to C-23): data modes Manual / On demand / Automatic, offline copy per event, Judge panel tab (hand-picked panels), draft vs. pushed projection with previews and Push button, style per event (colours, background lights / solid / image) used by output and branding pages, heats removed. Tests extended (`test-workflow.js`). Checked in a separate test instance on the sample event: panel edit, push, style change (draft pink, screen gold until push), on-demand failure keeps the offline data with a clear error.
 
+- 2026-11-19 **Judge gallery** (D-18, C-24): gallery per IDT with editable names, several photos per judge, main portrait, crop per photo, folder import, New judge, filters and search. Existing 6 judges convert automatically. Tested in a separate copy of the user's data: import of `Docs/judges` added 31 photos for 17 judges, a second import skipped all 31, main photo / delete / rename / crop work. One photo file in the folder is truncated (incomplete JPEG) and cannot be imported. `Docs/judges/` git-ignored.
+
 ## In progress
 - Nothing running.
 

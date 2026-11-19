@@ -30,11 +30,14 @@ contextBridge.exposeInMainWorld('dp', {
   themeReset: () => ipcRenderer.invoke('theme-reset'),
   themeImage: (file) => ipcRenderer.invoke('theme-image', file ? webUtils.getPathForFile(file) : null),
   themeImageRemove: () => ipcRenderer.invoke('theme-image-remove'),
-  // judges: names and photos
-  judgeName: (fedId, name) => ipcRenderer.invoke('judge-name', fedId, name),
-  judgePhoto: (fedId, file) => ipcRenderer.invoke('judge-photo', fedId, file ? webUtils.getPathForFile(file) : null),
-  judgeCrop: (fedId, crop) => ipcRenderer.invoke('judge-crop', fedId, crop),
-  judgePhotoRemove: (fedId) => ipcRenderer.invoke('judge-photo-remove', fedId),
+  // judge gallery. files = File objects from a drop (turned into paths here); none = open a file dialog
+  judgeUpdate: (fedId, patch) => ipcRenderer.invoke('judge-update', fedId, patch),
+  judgeCreate: (judge) => ipcRenderer.invoke('judge-create', judge),
+  judgePhotosAdd: (fedId, files, makeMain) => ipcRenderer.invoke('judge-photos-add', fedId, files ? [...files].map((f) => webUtils.getPathForFile(f)) : null, makeMain),
+  judgePhotoMain: (fedId, file) => ipcRenderer.invoke('judge-photo-main', fedId, file),
+  judgePhotoDelete: (fedId, file) => ipcRenderer.invoke('judge-photo-delete', fedId, file),
+  judgeCrop: (fedId, crop, file) => ipcRenderer.invoke('judge-crop', fedId, crop, file),
+  galleryImport: (dir) => ipcRenderer.invoke('gallery-import', dir), // no dir = folder dialog
   openUrl: (url) => ipcRenderer.invoke('open-url', url),
   // pushed from the main process
   onState: (fn) => ipcRenderer.on('state', (_e, s) => fn(s)),

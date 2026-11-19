@@ -22,7 +22,7 @@ Options: `--data=<folder>` uses a separate settings folder, `--devtools` opens t
 4. In **Competitions**, press **Show** on a row to put it on screen. Running competitions (judging enabled) are green and listed first.
 5. When the floor is split, tick **Floor is split in two halves**. Rows then get **A** and **B** buttons, and each side gets a Czech and English name and a colour matching the lighting.
 6. In **Judge panel**, check the panel from DanS or click judges to pick it by hand. **Use DanS panel** undoes your edits.
-7. In **Judges**, click a photo box or drop an image on it, and type the name to show on screen. Click a photo to adjust its crop.
+7. In **Judges** (the gallery, kept between events), press **Import folder…** to bring in photos named `IDT_Surname_Name[ Number].jpg`, for example from `Docs/judges` (importing again only adds new photos). Edit name and surname, click a small photo to make it the main one, × twice to delete it, + to add more. Click the big photo to adjust its framing.
 8. In **Style**, set this event's colours and background (moving lights, solid colour or an image).
 9. Nothing reaches the screen until you press **Push to projection** in the side panel. The two previews show what you prepared and what is on screen; the line above the button lists what is not pushed yet.
 10. Under **On-screen text**, choose the main language and the second language.
@@ -39,7 +39,7 @@ Add `&bg=1` (or `?bg=1`) to see a page with a dark background in a normal browse
 
 ## Where data is stored
 
-`%APPDATA%\dance-projector\`: `config.json` (server, event, modes, slots, styles), `judges.json` (display names per federation ID), `panels.json` (hand-picked panels), `cache\` (offline copies of DanS data), `photos\`, `media\` (background images), `pushed.json` (what is on screen).
+`%APPDATA%\dance-projector\`: `config.json` (server, event, modes, slots, styles), `judges.json` (judge gallery per IDT: names, photos, main photo, crops), `panels.json` (hand-picked panels), `cache\` (offline copies of DanS data), `photos\`, `media\` (background images), `pushed.json` (what is on screen).
 
 ## Updating the sample event
 

@@ -3,6 +3,7 @@
 // the schedule and the event's style. The result goes to projection.js as the draft.
 const { buildHeats } = require('./model');
 const { themeFor, themeView } = require('./theme');
+const { mainPhoto } = require('./gallery');
 
 // Crop is { x, y } in percent (focus point) and zoom >= 1. Missing crop = centred, upper third.
 function cleanCrop(c) {
@@ -11,15 +12,20 @@ function cleanCrop(c) {
   return { x: clamp(c.x, 0, 100, 50), y: clamp(c.y, 0, 100, 30), zoom: clamp(c.zoom, 1, 4, 1) };
 }
 
+// A judge as the output pages draw it. j is the DanS judge (letter, names, federation id); the gallery entry
+// for the same IDT adds the names the operator keeps, the optional name on screen and the main portrait.
+// Gallery names win over DanS, because they are the ones the operator checked.
 function judgeView(j, store) {
-  const extra = store.judge(j.fedId);
+  const g = store.judge(j.fedId);
+  const first = g.name || j.name || '', last = g.surname || j.surname || '';
+  const portrait = mainPhoto(g);
   return {
     letter: j.letter,
-    name: extra.displayName || `${j.name} ${j.surname}`.trim(),
-    firstName: j.name, surname: j.surname,
+    name: g.displayName || `${first} ${last}`.trim(),
+    firstName: first, surname: last,
     country: j.country && j.country !== 'CZE' ? j.country : '',
-    photo: extra.photo ? `/photos/${encodeURIComponent(extra.photo)}` : null,
-    crop: cleanCrop(extra.crop),
+    photo: portrait ? `/photos/${encodeURIComponent(portrait.file)}` : null,
+    crop: cleanCrop(portrait?.crop),
   };
 }
 

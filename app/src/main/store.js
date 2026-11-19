@@ -2,13 +2,14 @@
 // Everything the app keeps on disk, all inside the Electron userData folder (%APPDATA%\dance-projector):
 //
 //   config.json   settings (server, event, modes, slots, styles, …)
-//   judges.json   display names, photos and crops per judge federation id (reused at every event)
+//   judges.json   judge gallery per IDT: names, all photos with crops, main portrait (reused at every event)
 //   panels.json   judge panels picked by the operator: { eventId: { competitionId: [personId, …] } }
 //   cache/        the last data read from DanS per event, for manual mode and for starting without DanS
 //   photos/       judge photos        media/   background images of the styles
 //   pushed.json   what is on the projection (written by projection.js)
 const fs = require('fs');
 const path = require('path');
+const { migrateEntry } = require('./gallery');
 
 const DEFAULT_CONFIG = {
   server: 'http://localhost:8686',
@@ -78,8 +79,10 @@ class Store {
     this.cacheDir = path.join(dir, 'cache');
     for (const d of [this.photoDir, this.mediaDir, this.cacheDir]) fs.mkdirSync(d, { recursive: true });
     this.config = new JsonFile(path.join(dir, 'config.json'), DEFAULT_CONFIG);
-    // judges.json: { "<federation id>": { displayName, photo } }
+    // judges.json: the judge gallery, { "<IDT>": entry } – see gallery.js. Old single-photo entries are
+    // converted on load (and written back in the new shape on the next save).
     this.judges = new JsonFile(path.join(dir, 'judges.json'), {});
+    for (const [id, e] of Object.entries(this.judges.data)) this.judges.data[id] = migrateEntry(e);
     this.panels = new JsonFile(path.join(dir, 'panels.json'), {});
   }
 
@@ -141,7 +144,12 @@ class Store {
     return this.cfg.servers;
   }
 
+  // ---- judge gallery (see gallery.js for the shape of an entry) ----
   judge(fedId) { return this.judges.data[fedId] || {}; }
+  // Every judge in the gallery as [fedId, entry] pairs.
+  galleryEntries() { return Object.entries(this.judges.data); }
+
+  // Merges fields into a judge. null or '' removes a field; an entry left empty is removed.
   updateJudge(fedId, patch) {
     if (!fedId) throw new Error('judge has no federation id');
     const cur = { ...this.judge(fedId), ...patch };
@@ -151,25 +159,55 @@ class Store {
     return cur;
   }
 
-  importPhoto(fedId, srcFile) {
-    const ext = path.extname(srcFile).toLowerCase() || '.jpg';
-    const name = `${String(fedId).replace(/[^\w-]/g, '_')}-${Date.now()}${ext}`;
-    fs.copyFileSync(srcFile, path.join(this.photoDir, name));
-    // The old file is not deleted here: the projection may still show it until the next push.
-    // cleanupFiles() removes it later.
-    this.updateJudge(fedId, { photo: name, crop: null });
-    return name;
+  // Creates a gallery entry (or fills in missing names of an existing one) without touching its photos.
+  ensureJudge(fedId, { name, surname } = {}) {
+    const cur = this.judge(fedId);
+    this.updateJudge(fedId, { photos: cur.photos || [], name: cur.name || name, surname: cur.surname || surname });
   }
 
-  removePhoto(fedId) { this.updateJudge(fedId, { photo: null, crop: null }); } // file removed by cleanupFiles()
+  // Copies an already re-encoded image into photos/ and adds it to the judge.
+  // hash identifies the original file, so importing the same folder twice doesn't add duplicates.
+  // makeMain: true = becomes the portrait; otherwise only the first photo becomes main automatically.
+  addPhoto(fedId, srcFile, { hash = null, makeMain = false } = {}) {
+    const name = `${String(fedId).replace(/[^\w-]/g, '_')}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.jpg`;
+    fs.copyFileSync(srcFile, path.join(this.photoDir, name));
+    const cur = this.judge(fedId);
+    const photos = [...(cur.photos || []), { file: name, hash, crop: null }];
+    this.updateJudge(fedId, { photos, main: makeMain || !cur.main ? name : cur.main });
+    return name;
+  }
+  hasPhotoHash(fedId, hash) { return !!hash && (this.judge(fedId).photos || []).some((p) => p.hash === hash); }
+
+  // Removes one photo from the judge. The file itself stays until cleanupFiles(), because the projection may
+  // still show it until the next push. If it was the main photo, the next one becomes main.
+  deletePhoto(fedId, file) {
+    const cur = this.judge(fedId);
+    const photos = (cur.photos || []).filter((p) => p.file !== file);
+    this.updateJudge(fedId, { photos, main: cur.main === file ? (photos[0]?.file || null) : cur.main });
+  }
+  setMainPhoto(fedId, file) {
+    if ((this.judge(fedId).photos || []).some((p) => p.file === file)) this.updateJudge(fedId, { main: file });
+  }
+  // crop belongs to one photo: switching the main photo back and forth keeps each photo's framing
+  setPhotoCrop(fedId, file, crop) {
+    const cur = this.judge(fedId);
+    this.updateJudge(fedId, { photos: (cur.photos || []).map((p) => (p.file === file ? { ...p, crop } : p)) });
+  }
+
+  // Older single-photo calls, kept for existing callers: replace = add as main; remove = delete the main photo.
+  importPhoto(fedId, srcFile) { return this.addPhoto(fedId, srcFile, { makeMain: true }); }
+  removePhoto(fedId) { const m = this.judge(fedId).main; if (m) this.deletePhoto(fedId, m); }
 
   // Deletes photos and background images nothing uses any more. keep = file names the projection still shows.
   cleanupFiles(keep = new Set()) {
     const used = new Set(keep);
-    for (const j of Object.values(this.judges.data)) if (j.photo) used.add(j.photo);
+    for (const j of Object.values(this.judges.data)) for (const p of j.photos || []) used.add(p.file);
     for (const t of Object.values(this.cfg.themes || {})) if (t.image) used.add(t.image);
     for (const dir of [this.photoDir, this.mediaDir]) {
-      for (const f of fs.readdirSync(dir)) if (!used.has(f)) fs.rm(path.join(dir, f), { force: true }, () => {});
+      for (const f of fs.readdirSync(dir)) {
+        if (used.has(f)) continue;
+        try { fs.rmSync(path.join(dir, f), { force: true }); } catch { /* locked by another program: try next time */ }
+      }
     }
   }
 

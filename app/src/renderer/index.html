@@ -53,15 +53,24 @@
   </section>
 
   <section id="tab-judges" class="pane" hidden>
+    <!-- Judge gallery: kept between events, one entry per IDT (gallery.js) -->
     <div class="tools">
       <div class="chips" id="jfilter">
-        <button data-f="all" class="chip active">All judges</button>
+        <button data-f="all" class="chip active">All</button>
+        <button data-f="event" class="chip">In this event</button>
         <button data-f="slots" class="chip">On screen now</button>
+        <button data-f="nophoto" class="chip">No photo</button>
       </div>
-      <p class="hint">Photos and names are saved per judge and reused at every event. Drop an image on a photo to replace it.</p>
+      <input id="jsearch" placeholder="Find IDT or name" spellcheck="false">
+      <span class="sub" id="jcount"></span>
+      <span class="spacer"></span>
+      <button id="judge-new">New judge…</button>
+      <button id="gallery-import" class="primary" title="Import every photo named IDT_Surname_Name[ Number] from a folder. Photos already in the gallery are skipped.">Import folder…</button>
     </div>
+    <div class="import-report" id="import-report" hidden></div>
+    <p class="hint">Saved per IDT and reused at every event. The big photo is the one on screen: click it to adjust the framing. Click a small photo to make it the main one.</p>
     <div class="judges" id="judges"></div>
-    <p class="empty" id="judges-empty" hidden>Choose an event to load its judges.</p>
+    <p class="empty" id="judges-empty" hidden></p>
   </section>
 
   <!-- Judge panel of each competition on screen: from DanS, or picked by hand -->
@@ -174,6 +183,21 @@
       <span class="spacer"></span>
       <button value="cancel" formnovalidate>Cancel</button>
       <button value="save" class="primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="judge-dlg">
+  <form method="dialog" class="dlg-box">
+    <h3>New judge</h3>
+    <label class="stack"><small>IDT</small><input id="nj-idt" inputmode="numeric" spellcheck="false" required placeholder="10000001"></label>
+    <label class="stack"><small>Name</small><input id="nj-name"></label>
+    <label class="stack"><small>Surname</small><input id="nj-surname"></label>
+    <p class="err" id="nj-error"></p>
+    <div class="crop-actions">
+      <span class="spacer"></span>
+      <button value="cancel" formnovalidate>Cancel</button>
+      <button value="save" class="primary">Add judge</button>
     </div>
   </form>
 </dialog>

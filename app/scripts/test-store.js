@@ -14,7 +14,7 @@ s.updateJudge('90000001', { displayName: 'Ing. Adam Testovací' });
 s.flush();
 const v = judgeView({ fedId: '90000001', letter: 'C', name: 'Adam', surname: 'Testovací', country: 'CZE' }, s);
 assert.strictEqual(v.name, 'Ing. Adam Testovací'); assert.strictEqual(v.country, ''); assert.ok(v.photo.endsWith(name));
-const s2 = new Store(dir); assert.strictEqual(s2.judge('90000001').photo, name, 'persisted');
+const s2 = new Store(dir); assert.strictEqual(s2.judge('90000001').main, name, 'persisted');
 // saved servers: normalised address, default name, rename and readdress in place, delete
 s.saveServer({ name: 'Hall', url: '192.168.1.80:8686/' });
 s.saveServer({ name: '', url: 'http://localhost:8686' });
@@ -30,7 +30,7 @@ srv.listen(0, '127.0.0.1').then(({ port }) => {
   const get = (p) => new Promise((r) => http.get(`http://127.0.0.1:${port}${p}`, (res) => { res.resume(); r(res.statusCode); }));
   Promise.all([get(v.photo), get('/photos/..%2F..%2Fconfig.json'), get('/out/heats.html'), get('/api/state')]).then(([a, b, c, d]) => {
     assert.strictEqual(a, 200); assert.notStrictEqual(b, 200, 'path traversal blocked'); assert.strictEqual(c, 200); assert.strictEqual(d, 200);
-    s.removePhoto('90000001'); assert.ok(!s.judge('90000001').photo);
+    s.removePhoto('90000001'); assert.ok(!s.judge('90000001').main);
   }).then(async () => {
     // update protocol: short polls, 204 when unchanged, no held-open stream
     srv.publish({ slots: {}, n: 1 });

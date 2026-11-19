@@ -24,11 +24,15 @@ Electron desktop app for the operator. Top bar, four tabs (Competitions, Judge p
 ## 3b. On-screen text
 - Main language (Czech or English), second language (English, Czech or none).
 
-## 4. Judges
-- List of the event's judges: letter, federation name, display name field, photo with **Choose…** and **Remove**.
-- With a photo: **Adjust crop** (drag, zoom; frame matches the judge card), **Change photo**, **Remove**. Clicking the photo opens the crop editor.
-- Photos are copied to `<userData>/photos/<fedId>-<time>.<ext>`; names and crops in `<userData>/judges.json`.
-- Filter: all judges, or only those in slot A/B competitions.
+## 4. Judges – the gallery (decision D-18)
+- A gallery kept between events, one entry per judge **IDT** (the federation id DanS reports). The tab lists every gallery judge plus the current event's judges (marked "In this event"; "Not in gallery yet" until something is saved).
+- Each card: main portrait (click = crop editor; drop an image = add it as the new main photo), IDT, letter at this event, editable **Name** and **Surname** (DanS names as placeholders; a note when DanS spells them differently), optional **Name on screen** (e.g. with a title), and a strip of all photos: click = make main, × then "Delete?" = delete, + or drop = add photos.
+- Crop (focus point and zoom, frame matches the judge card) is stored per photo.
+- **Import folder…** reads files named `IDT_Surname_Name[ Number].jpg|jpeg|png|webp` (default folder `Docs/judges`, which is git-ignored). New judges get the names from the file name; names already in the gallery are kept. Photos already imported (same file content, SHA-1) are skipped, so a folder can be imported again after adding photos. The report lists added, skipped, unrecognised and unreadable files.
+- **New judge…** adds a judge by IDT, name and surname.
+- Filters: all, in this event, on screen now, without photo; search by IDT or name.
+- Photos are re-encoded (baseline JPEG, max 900 px) into `<userData>/photos/`; the gallery is `<userData>/judges.json` (shape in `app/src/main/gallery.js`; older single-photo entries are converted on load). Deleted photos stay on disk until the next push or start, so the screen never loses an image it still shows.
+- On screen: gallery names win over DanS; Name on screen wins over both; the main photo with its crop.
 
 ## 4b. Judge panel (D-13, D-14)
 - One block per competition on screen (A, and B on a split floor): title, round, where the panel comes from (**Panel from DanS**, **Picked by hand** with the difference to DanS, or **No panel yet**), number selected.

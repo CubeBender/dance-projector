@@ -61,7 +61,10 @@ Claude's decision log. Questions that need the user are asked in the conversatio
 - **Context (2026-11-19):** the user asked whether the printed DanS panel list could be read from the webcam, with human review before pushing.
 - **Status:** feasible (offline Tesseract + matching against the known judge list, uncertain matches flagged). Waiting for a photo/scan of a real printout before building it.
 
-## Claude's decisions
+### D-18 Judge gallery
+- **Decision (user, 2026-11-19):** keep a gallery of judges inside the app, identified by IDT, with editable name and surname, all photos a judge sent, and a chosen main portrait that can be changed later. Photos come from `Docs/judges`, named `IDT_Surname_Name[ Number]`.
+- **Also (user):** comment the code more, the user reviews it.
+
 
 ### C-01 Technology: Electron with plain JavaScript, no framework or build step
 - **Why:** few dependencies, easy to adjust on the day, nothing to compile.
@@ -154,6 +157,10 @@ Claude's decision log. Questions that need the user are asked in the conversatio
 ### C-23 Heats removed from use
 - **Decision:** heats are no longer listed in the app, the heats setting is hidden, heat draws are not read, and the build script no longer creates "10 Heats" / "13 Heats B". The page and model code stay.
 - **Why:** D-13 (heats not needed for now); keeping the code makes bringing them back cheap.
+
+### C-24 Gallery details
+- **Decision:** IDT = the federation id DanS gives as `in_authority_id` (same 8-digit numbers). Crop per photo. Import skips files already imported (SHA-1 of the original), keeps names already in the gallery, and reports unrecognised or unreadable files. Gallery names win over DanS on screen. Delete asks with a second click on the photo instead of a dialog. `Docs/judges/` is git-ignored and blocked by the pre-commit hook.
+- **Why:** re-importing the folder after adding photos must be safe; the operator's corrections must survive; photos of real people must never reach the public repository.
 
 ## Changes
 

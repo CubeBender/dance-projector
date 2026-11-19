@@ -10,6 +10,7 @@
 // The operator window never reaches DanS or the files itself; it asks this process through preload.js.
 const { app, BrowserWindow, ipcMain, dialog, shell, nativeImage } = require('electron');
 const fs = require('fs');
+const crypto = require('crypto');
 const os = require('os');
 const path = require('path');
 const { DansClient } = require('./dans');
@@ -21,6 +22,7 @@ const { Projection } = require('./projection');
 const { applyPanels, togglePanel } = require('./panels');
 const { cleanTheme, themeFor, themeKey } = require('./theme');
 const { outputState, judgeView, cleanCrop } = require('./view');
+const { sortForImport, mainPhoto } = require('./gallery');
 
 // Command-line options: --fixture=<file> plays back a saved event instead of DanS; --data=<folder> uses a
 // separate settings folder (handy for testing next to the real instance).
@@ -49,29 +51,56 @@ function lanAddresses() {
 // files small.
 function normalizeImage(src, dest, maxWidth = 900) {
   let img = nativeImage.createFromPath(src);
-  if (img.isEmpty()) throw new Error('Not a supported image');
+  if (img.isEmpty()) throw new Error('could not be read – not a JPEG/PNG/WebP image, or the file is damaged or incomplete');
   const { width } = img.getSize();
   if (width > maxWidth) img = img.resize({ width: maxWidth, quality: 'best' });
   fs.writeFileSync(dest, img.toJPEG(90));
 }
 
-function importJudgePhoto(fedId, file) {
+// SHA-1 of a file's bytes. Identifies an original photo, so importing the same folder again skips it.
+const fileHash = (file) => crypto.createHash('sha1').update(fs.readFileSync(file)).digest('hex');
+
+// Adds one image file to a judge's gallery: re-encode, copy into photos/, remember its hash.
+// Returns false when this exact file is already in the judge's gallery.
+function addJudgePhoto(fedId, file, { makeMain = false } = {}) {
+  const hash = fileHash(file);
+  if (store.hasPhotoHash(fedId, hash)) return false;
   const tmp = path.join(app.getPath('temp'), `dp-photo-${Date.now()}.jpg`);
   normalizeImage(file, tmp);
-  try { store.importPhoto(fedId, tmp); } finally { fs.rm(tmp, { force: true }, () => {}); }
+  try { store.addPhoto(fedId, tmp, { hash, makeMain }); } finally { fs.rm(tmp, { force: true }, () => {}); }
+  return true;
+}
+
+// Imports a folder of photos named "IDT_Surname_Name[ Number].ext" (gallery.js parseFileName).
+// New judges get the names from the file name; names already in the gallery are kept, because the operator
+// may have corrected them. Returns a report for the window.
+function importGalleryFolder(dir) {
+  const report = { added: 0, judges: new Set(), duplicates: 0, unrecognised: [], failed: [] };
+  const files = fs.readdirSync(dir, { withFileTypes: true }).filter((d) => d.isFile()).map((d) => ({ name: d.name }));
+  for (const { f, info } of sortForImport(files)) {
+    if (!info) { if (!f.name.startsWith('.')) report.unrecognised.push(f.name); continue; }
+    try {
+      store.ensureJudge(info.idt, { name: info.name, surname: info.surname });
+      if (addJudgePhoto(info.idt, path.join(dir, f.name))) { report.added++; report.judges.add(info.idt); } else report.duplicates++;
+    } catch (e) { report.failed.push(`${f.name}: ${e.message}`); }
+  }
+  return { ...report, judges: report.judges.size, folder: dir };
 }
 
 // One-time conversion of photos imported before normalisation existed (originals kept in photos-original).
 function normalizeExistingPhotos() {
-  for (const [fedId, j] of Object.entries(store.judges.data)) {
-    if (!j.photo || j.normalized) continue;
-    const file = path.join(store.photoDir, j.photo);
+  for (const [fedId, j] of store.galleryEntries()) {
+    if (j.normalized !== undefined || !j.photos?.length) continue; // new imports are always re-encoded
     const keep = path.join(store.dir, 'photos-original');
     try {
       fs.mkdirSync(keep, { recursive: true });
-      if (!fs.existsSync(path.join(keep, j.photo))) fs.copyFileSync(file, path.join(keep, j.photo));
-      normalizeImage(file, file + '.tmp'); fs.renameSync(file + '.tmp', file); store.updateJudge(fedId, { normalized: true }); }
-    catch (e) { console.error('photo', fedId, e.message); }
+      for (const p of j.photos) {
+        const file = path.join(store.photoDir, p.file);
+        if (!fs.existsSync(path.join(keep, p.file))) fs.copyFileSync(file, path.join(keep, p.file));
+        normalizeImage(file, file + '.tmp'); fs.renameSync(file + '.tmp', file);
+      }
+      store.updateJudge(fedId, { normalized: true });
+    } catch (e) { console.error('photo', fedId, e.message); }
   }
 }
 
@@ -172,8 +201,10 @@ function rendererState() {
     })),
     judges: [...(model?.judges.values() || [])].map((j) => {
       const v = judgeView(j, store);
-      return { ...j, displayName: store.judge(j.fedId).displayName || '', photo: v.photo && base ? base + v.photo : null, crop: v.crop, inSlots: inSlots.has(j.personId) };
+      // displayName = the name as the projection shows it (gallery names and name on screen win over DanS)
+      return { ...j, displayName: v.name, photo: v.photo && base ? base + v.photo : null, crop: v.crop, inSlots: inSlots.has(j.personId) };
     }).sort((a, b) => a.letter.localeCompare(b.letter, 'cs')),
+    gallery: galleryView(base, inSlots),
     theme: { ...theme, imageUrl: theme.image && base ? `${base}/media/${encodeURIComponent(theme.image)}` : null },
     projection: { auto: projection.auto, changes: projection.changes(), pushedAt: projection.pushedAt },
     outputs: outputAddr ? {
@@ -191,6 +222,27 @@ function rendererState() {
       ],
     } : null,
   };
+}
+
+// The Judges tab: every judge in the gallery plus every judge of the current event (even without a gallery
+// entry yet), with all photos. DanS names are shown as hints next to the editable gallery names.
+function galleryView(base, inSlots) {
+  const byId = new Map();
+  for (const [fedId, g] of store.galleryEntries()) byId.set(fedId, { fedId, g, dans: null, inGallery: true });
+  for (const j of model?.judges.values() || []) {
+    if (!j.fedId) continue;
+    const row = byId.get(j.fedId) || { fedId: j.fedId, g: {}, dans: null, inGallery: false };
+    row.dans = j; byId.set(j.fedId, row);
+  }
+  const url = (file) => (base ? `${base}/photos/${encodeURIComponent(file)}` : null);
+  return [...byId.values()].map(({ fedId, g, dans, inGallery }) => ({
+    fedId, inGallery,
+    name: g.name || '', surname: g.surname || '', displayName: g.displayName || '',
+    dansName: dans?.name || '', dansSurname: dans?.surname || '',
+    letter: dans?.letter || '', inEvent: !!dans, inSlots: !!dans && inSlots.has(dans.personId),
+    main: mainPhoto(g)?.file || null,
+    photos: (g.photos || []).map((p) => ({ file: p.file, url: url(p.file), crop: cleanCrop(p.crop) })),
+  })).sort((a, b) => (a.surname || a.dansSurname).localeCompare(b.surname || b.dansSurname, 'cs'));
 }
 
 // Recomputes the draft and sends the window a new state. Status-only changes go as a lighter 'status' message.
@@ -316,21 +368,59 @@ function setupIpc() {
     store.updateConfig(allowed); rebuild(); return rendererState();
   });
 
-  // ---- judges: names and photos ----
-  ipcMain.handle('judge-name', (_e, fedId, displayName) => { store.updateJudge(fedId, { displayName: String(displayName || '').trim() }); rebuild(); return rendererState(); });
-  ipcMain.handle('judge-photo', async (_e, fedId, filePath) => {
-    let file = filePath;
-    if (!file) {
-      const r = await dialog.showOpenDialog(win, { title: 'Judge photo', properties: ['openFile'], filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp'] }] });
-      if (r.canceled || !r.filePaths[0]) return rendererState();
-      file = r.filePaths[0];
-    }
-    try { importJudgePhoto(fedId, file); store.updateJudge(fedId, { normalized: true }); }
-    catch (e) { dialog.showErrorBox('Judge photo', `This file could not be used as a photo: ${e.message}`); }
+  // ---- judge gallery: names and photos (gallery.js, store.js) ----
+  const imageFilter = [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp'] }];
+  // Name fields: name, surname, displayName (optional name on screen). Empty text removes the field.
+  ipcMain.handle('judge-update', (_e, fedId, patch) => {
+    const clean = {};
+    for (const k of ['name', 'surname', 'displayName']) if (k in patch) clean[k] = String(patch[k] || '').trim();
+    store.ensureJudge(fedId); store.updateJudge(fedId, clean); rebuild(); return rendererState();
+  });
+  // New judge typed in by hand. The IDT is required and must be a number, like the federation ids.
+  ipcMain.handle('judge-create', (_e, { fedId, name, surname }) => {
+    fedId = String(fedId || '').trim();
+    if (!/^\d{3,}$/.test(fedId)) return { ...rendererState(), error: 'The IDT must be a number.' };
+    store.ensureJudge(fedId, { name: String(name || '').trim(), surname: String(surname || '').trim() });
     rebuild(); return rendererState();
   });
-  ipcMain.handle('judge-crop', (_e, fedId, crop) => { store.updateJudge(fedId, { crop: crop ? cleanCrop(crop) : null }); rebuild(); return rendererState(); });
-  ipcMain.handle('judge-photo-remove', (_e, fedId) => { store.removePhoto(fedId); rebuild(); return rendererState(); });
+  // Adds photos to one judge: from a file dialog (several at once) or files dropped on the card.
+  // makeMain: the first added photo becomes the portrait (used when dropping on the big photo).
+  ipcMain.handle('judge-photos-add', async (_e, fedId, filePaths, makeMain = false) => {
+    let files = filePaths?.length ? filePaths : null;
+    if (!files) {
+      const r = await dialog.showOpenDialog(win, { title: 'Add judge photos', properties: ['openFile', 'multiSelections'], filters: imageFilter });
+      if (r.canceled || !r.filePaths.length) return rendererState();
+      files = r.filePaths;
+    }
+    store.ensureJudge(fedId);
+    const failed = [];
+    files.forEach((f, i) => {
+      try { addJudgePhoto(fedId, f, { makeMain: makeMain && i === 0 }); } catch (e) { failed.push(`${path.basename(f)}: ${e.message}`); }
+    });
+    if (failed.length) dialog.showErrorBox('Judge photos', `These files could not be used:\n${failed.join('\n')}`);
+    rebuild(); return rendererState();
+  });
+  ipcMain.handle('judge-photo-main', (_e, fedId, file) => { store.setMainPhoto(fedId, file); rebuild(); return rendererState(); });
+  ipcMain.handle('judge-photo-delete', (_e, fedId, file) => { store.deletePhoto(fedId, file); rebuild(); return rendererState(); });
+  // Crop of one photo; without a file name it is the main photo's.
+  ipcMain.handle('judge-crop', (_e, fedId, crop, file) => {
+    const target = file || mainPhoto(store.judge(fedId))?.file;
+    if (target) store.setPhotoCrop(fedId, target, crop ? cleanCrop(crop) : null);
+    rebuild(); return rendererState();
+  });
+  // Imports a whole folder. The dialog starts in Docs/judges of this project when it exists.
+  ipcMain.handle('gallery-import', async (_e, dirPath) => {
+    let dir = dirPath;
+    if (!dir) {
+      const docs = path.join(__dirname, '..', '..', '..', 'Docs', 'judges');
+      const r = await dialog.showOpenDialog(win, { title: 'Import judge photos from a folder', properties: ['openDirectory'], defaultPath: fs.existsSync(docs) ? docs : undefined });
+      if (r.canceled || !r.filePaths[0]) return { state: rendererState(), report: null };
+      dir = r.filePaths[0];
+    }
+    const report = importGalleryFolder(dir);
+    rebuild();
+    return { state: rendererState(), report };
+  });
 
   // Opens an output page in the normal browser; only addresses of our own output server.
   ipcMain.handle('open-url', (_e, url) => { if (/^https?:\/\/(localhost|127\.0\.0\.1|[\d.]+):\d+\//.test(url)) shell.openExternal(url); });

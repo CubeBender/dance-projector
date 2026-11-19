@@ -14,6 +14,8 @@ obs/backup-*/
 obs/private/
 
 # App data if ever copied into the project: judge photos, display names, settings
+# Judge photo gallery source folder (real people's photos named by IDT)
+Docs/judges/
 **/photos/
 judges.json
 config.json
