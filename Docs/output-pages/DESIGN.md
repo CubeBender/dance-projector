@@ -1,7 +1,7 @@
 # Output pages – design notes
 
 - **Audience and job:** parents and dancers in the hall, finding their start number in a heat from a distance.
-- **Signature:** start numbers, judge letters and competition numbers are drawn as competitor back-number cards: white card, heavy condensed black numerals, a thin strip in the floor-side colour.
+- **Signature:** start numbers and competition numbers are drawn as competitor back-number cards: card in the style's accent (white before 2026-11-19), heavy condensed numerals in dark ink, a thin strip in the floor-side colour. Judge cards no longer carry letters (D-20).
 - **Colour:** the only accent is the slot's floor-side colour (`--side`). Everything else is white paper, near-black ink and dark glass plates (`rgba(9,11,18,0.8)`) over a transparent page.
 - **Type:** Bahnschrift (built into Windows, DIN-like, variable width) for numerals, titles and captions; Segoe UI for names. No web fonts, so it works offline in OBS.
 - **Dance progress:** dances shown in order as pills; done ones struck through, current one filled. This is a real sequence, so the order carries meaning.

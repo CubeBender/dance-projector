@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fotka soutěžícího</title>
+<!-- Phone upload page (decision C-34). Served by the app's competitor server at /upload?key=…, only while the
+     operator has it switched on. The organizer types a start number, takes or picks a photo, and sends it; the
+     app makes it that competitor's main photo. Everything is in this one file: no outside scripts or fonts. -->
+<style>
+  :root { --bg: #111318; --card: #1c1f27; --line: #2c313d; --text: #eef0f4; --muted: #9aa3b5; --accent: #d9b26f; --ok: #3ecf8e; --err: #ff6b6b; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); }
+  h1 { font-size: 20px; margin: 4px 0 16px; }
+  small, .en { color: var(--muted); font-size: 13px; }
+  label { display: block; margin-bottom: 6px; }
+  .num { width: 100%; font-size: 44px; font-weight: 700; text-align: center; padding: 10px; border-radius: 14px; border: 2px solid var(--line); background: var(--card); color: var(--text); letter-spacing: 0.04em; }
+  .num:focus { outline: none; border-color: var(--accent); }
+  .who { min-height: 1.5em; margin: 8px 2px 18px; font-size: 18px; }
+  .who.unknown { color: var(--muted); }
+  .row { display: flex; gap: 10px; }
+  button { flex: 1; font: inherit; font-weight: 600; padding: 16px 12px; border-radius: 14px; border: 2px solid var(--line); background: var(--card); color: var(--text); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #17130c; }
+  button:disabled { opacity: 0.45; }
+  .preview { margin: 16px 0; border-radius: 14px; overflow: hidden; background: var(--card); aspect-ratio: 3 / 4; display: none; }
+  .preview img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .msg { margin-top: 14px; padding: 12px 14px; border-radius: 12px; display: none; }
+  .msg.ok { display: block; background: color-mix(in srgb, var(--ok) 18%, var(--card)); color: var(--ok); }
+  .msg.err { display: block; background: color-mix(in srgb, var(--err) 18%, var(--card)); color: var(--err); }
+  .msg.busy { display: block; background: var(--card); color: var(--muted); }
+  input[type=file] { display: none; }
+  #send { margin-top: 14px; }
+</style>
+</head>
+<body>
+<h1>Fotka soutěžícího <span class="en">· Competitor photo</span></h1>
+
+<label for="number">Startovní číslo <span class="en">· Start number</span></label>
+<input id="number" class="num" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="—">
+<div class="who unknown" id="who">&nbsp;</div>
+
+<div class="row">
+  <!-- capture: opens the camera straight away; the second button picks a photo already on the phone -->
+  <button type="button" id="take">📷 Vyfotit<br><span class="en">Take photo</span></button>
+  <button type="button" id="pick">🖼 Z galerie<br><span class="en">From gallery</span></button>
+</div>
+<input type="file" id="cam" accept="image/*" capture="environment">
+<input type="file" id="lib" accept="image/*">
+
+<div class="preview" id="preview"><img id="img" alt=""></div>
+<button type="button" class="primary" id="send" disabled style="width:100%">Odeslat <span class="en">· Send</span></button>
+<div class="msg" id="msg"></div>
+
+<script>
+'use strict';
+const key = new URLSearchParams(location.search).get('key') || '';
+const $ = (id) => document.getElementById(id);
+let names = new Map();   // start number -> name shown under the number field
+let photo = null;        // the shrunk photo waiting to be sent (Blob)
+
+// Who is this number? Asked once when the page opens; a number the app doesn't know can still be sent.
+fetch(`/upload/list?key=${encodeURIComponent(key)}`).then((r) => (r.ok ? r.json() : null)).then((d) => {
+  if (d) names = new Map(d.competitors.map((c) => [String(c.number), c.label]));
+  showWho();
+}).catch(() => {});
+
+function number() { const v = $('number').value.trim(); return /^\d{1,4}$/.test(v) && Number(v) > 0 ? String(Number(v)) : ''; }
+function showWho() {
+  const n = number(), label = names.get(n);
+  $('who').textContent = !n ? ' ' : label || 'Neznámé číslo – fotka se přesto uloží · unknown number, saved anyway';
+  $('who').classList.toggle('unknown', !label);
+  $('send').disabled = !n || !photo;
+}
+$('number').addEventListener('input', showWho);
+
+// Phone photos are large (4–12 MB). Shrinking to 1600 px on the phone makes sending fast on venue Wi-Fi; the app
+// re-encodes it again anyway. The <img> element applies the photo's EXIF orientation, so the result is upright.
+function shrink(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.naturalWidth * scale); c.height = Math.round(img.naturalHeight * scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      c.toBlob((b) => (b ? resolve(b) : reject(new Error('shrink failed'))), 'image/jpeg', 0.9);
+    };
+    img.onerror = () => reject(new Error('Tento soubor není obrázek · not an image'));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+async function chosen(input) {
+  const f = input.files[0]; input.value = '';
+  if (!f) return;
+  msg('busy', 'Připravuji… · Preparing…');
+  try {
+    photo = await shrink(f);
+    $('img').src = URL.createObjectURL(photo);
+    $('preview').style.display = 'block';
+    msg('', '');
+  } catch (e) { photo = null; msg('err', e.message); }
+  showWho();
+}
+$('take').addEventListener('click', () => $('cam').click());
+$('pick').addEventListener('click', () => $('lib').click());
+$('cam').addEventListener('change', (e) => chosen(e.target));
+$('lib').addEventListener('change', (e) => chosen(e.target));
+
+function msg(kind, text) { $('msg').className = 'msg ' + kind; $('msg').textContent = text; }
+
+$('send').addEventListener('click', async () => {
+  const n = number();
+  if (!n || !photo) return;
+  $('send').disabled = true;
+  msg('busy', 'Odesílám… · Sending…');
+  try {
+    const r = await fetch(`/upload/photo?key=${encodeURIComponent(key)}&number=${n}`, { method: 'POST', headers: { 'content-type': 'image/jpeg' }, body: photo });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || (r.status === 403 ? 'Odkaz už neplatí · link no longer active' : `Chyba ${r.status}`));
+    msg('ok', `✓ Uloženo k číslu ${n}${d.label ? ' – ' + d.label : ''} · Saved`);
+    // ready for the next competitor
+    photo = null; $('preview').style.display = 'none'; $('number').value = ''; showWho(); $('number').focus();
+  } catch (e) {
+    msg('err', `${e.message || 'Nepodařilo se odeslat'} – zkuste znovu · try again`);
+    $('send').disabled = false;
+  }
+});
+</script>
+</body>
+</html>

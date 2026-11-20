@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' http://localhost:* http://127.0.0.1:* data:; frame-src http://localhost:* http://127.0.0.1:*; style-src 'self' 'unsafe-inline'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' http://localhost:* http://127.0.0.1:* data: blob:; frame-src http://localhost:* http://127.0.0.1:*; style-src 'self' 'unsafe-inline'">
 <title>Dance Projector</title>
 <link rel="stylesheet" href="app.css">
 </head>
@@ -32,6 +32,7 @@
   <button class="tab active" data-tab="competitions">Competitions</button>
   <button class="tab" data-tab="panel">Judge selection</button>
   <button class="tab" data-tab="judges">Judges</button>
+  <button class="tab" data-tab="competitors">Competitors</button>
   <button class="tab" data-tab="style">Style</button>
 </nav>
 
@@ -79,17 +80,43 @@
     <div id="panels"></div>
   </section>
 
+  <!-- Competitors of semifinals and finals (decision D-22): what the competitor screen shows, the phone upload
+       page, and every competitor of the event with photos. Filled in by app.js (renderCompetitors). -->
+  <section id="tab-competitors" class="pane" hidden>
+    <div id="cscreen"></div>
+    <div id="cphone"></div>
+    <div class="tools">
+      <div class="chips" id="cfilter">
+        <button data-f="all" class="chip active">All</button>
+        <button data-f="round" class="chip">In the round</button>
+        <button data-f="nophoto" class="chip">No photo</button>
+        <button data-f="nonumber" class="chip" title="Registered in DanS, start number not given yet">No number yet</button>
+        <button data-f="own" class="chip" title="Typed in the app or sent from the phone, not in the DanS start list">Not from DanS</button>
+      </div>
+      <input id="csearch" placeholder="Find number, name or IDT" spellcheck="false">
+      <span class="sub" id="ccount"></span>
+      <span class="spacer"></span>
+      <button id="comp-new">New competitor…</button>
+    </div>
+    <p class="hint"><b>Ctrl+V</b> pastes a copied image (in WhatsApp Desktop: right-click the photo → Copy) to the selected competitor; with none selected it asks for the number. Click a card to select it. Image files can be dropped on any card.</p>
+    <div class="ccards" id="clist"></div>
+    <p class="empty" id="clist-empty" hidden></p>
+  </section>
+
   <!-- Colours and background of the projection, one style per event (decision D-15) -->
   <section id="tab-style" class="pane" hidden>
     <p class="hint" id="style-for"></p>
     <div class="style-grid">
       <div class="style-col">
+        <h3>Event colours</h3>
+        <div class="chips presets" id="presets"></div>
         <h3>Colours</h3>
         <label class="colorrow"><input type="color" data-theme="accent"><span><b>Accent</b><small>Whole-floor colour, highlights, lines</small></span></label>
         <label class="colorrow"><input type="color" data-theme="secondary"><span><b>Second colour</b><small>Second light on the background</small></span></label>
         <label class="colorrow"><input type="color" data-theme="ground"><span><b>Background</b><small>Base colour behind everything</small></span></label>
         <label class="colorrow"><input type="color" data-theme="panel"><span><b>Panels</b><small>Plates behind text and photos</small></span></label>
-        <label class="stack">Panel opacity <input type="range" min="20" max="100" step="1" data-theme="panelOpacity"></label>
+        <label class="colorrow"><input type="color" data-theme="text"><span><b>Text</b><small>Names and titles; the quieter text is mixed from it</small></span></label>
+        <label class="stack">Panel opacity <input type="range" min="0" max="100" step="1" data-theme="panelOpacity"></label>
       </div>
       <div class="style-col">
         <h3>Background</h3>
@@ -97,12 +124,19 @@
           <button class="chip" data-bg="lights">Moving lights</button>
           <button class="chip" data-bg="solid">Solid colour</button>
           <button class="chip" data-bg="image">Image</button>
+          <button class="chip" data-bg="none" title="No background from the app: add your own in OBS under the output pages">Transparent</button>
         </div>
+        <p class="hint" id="bg-none-hint">The output pages are always transparent. With <b>Transparent</b> the Background page is empty too, so you can put your own background in OBS underneath.</p>
         <div class="bg-image" id="bg-image">
           <div class="bg-thumb" id="bg-thumb">Drop an image here or click to choose</div>
           <label class="stack">Darken image <input type="range" min="0" max="90" step="1" data-theme="imageDim"></label>
           <button id="bg-remove" class="ghost">Remove image</button>
         </div>
+        <h3>Sponsor strip in OBS</h3>
+        <label class="stack">Kept clear at the bottom (px, 0 = no strip)
+          <input type="number" min="0" max="400" step="1" data-theme="strip">
+          <small>The pages leave this height plus 24 px free at the bottom, and the header moves up to 24 px from the top.</small>
+        </label>
         <button id="theme-reset" class="ghost">Reset style to default</button>
       </div>
     </div>
@@ -118,9 +152,15 @@
         <figure><figcaption>Prepared</figcaption><div class="pv" id="pv-draft"></div></figure>
         <figure><figcaption>On screen</figcaption><div class="pv" id="pv-live"></div></figure>
       </div>
+      <div class="proj-name">Judges</div>
       <div class="changes" id="proj-changes"></div>
-      <button id="push" class="push">Push to projection</button>
+      <button id="push" class="push">Push judges</button>
       <div class="pushed" id="proj-pushed"></div>
+      <!-- the competitor projection has its own port and its own push (C-32) -->
+      <div class="proj-name">Competitors</div>
+      <div class="changes" id="cproj-changes"></div>
+      <button id="push-comp" class="push">Push competitors</button>
+      <div class="pushed" id="cproj-pushed"></div>
     </div>
 
     <h2>Floor</h2>
@@ -219,6 +259,57 @@
   </form>
 </dialog>
 
+<!-- New competitor typed by hand. The second person is shown for couples. Find asks ČSTS for the name by IDT. -->
+<dialog id="comp-dlg">
+  <form method="dialog" class="dlg-box wide">
+    <h3>New competitor</h3>
+    <div class="nc-top">
+      <label class="stack"><small>Start number (optional)</small><input id="nc-number" inputmode="numeric" maxlength="4"></label>
+      <div class="chips" id="nc-kind"><button type="button" class="chip active" data-k="solo">Solo</button><button type="button" class="chip" data-k="couple">Couple</button></div>
+    </div>
+    <div id="nc-people"></div>
+    <p class="err" id="nc-error"></p>
+    <div class="crop-actions">
+      <span class="spacer"></span>
+      <button value="cancel" formnovalidate>Cancel</button>
+      <button value="save" class="primary">Add competitor</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- A pasted image with no competitor selected: which number is it for? -->
+<dialog id="paste-dlg">
+  <form method="dialog" class="dlg-box">
+    <h3>Photo for which number?</h3>
+    <img id="paste-img" class="paste-img" alt="">
+    <label class="stack"><small>Start number</small><input id="paste-number" inputmode="numeric" maxlength="4" autocomplete="off"></label>
+    <div class="sub" id="paste-who">&nbsp;</div>
+    <div class="crop-actions">
+      <span class="spacer"></span>
+      <button value="cancel" formnovalidate>Cancel</button>
+      <button value="save" class="primary">Use photo</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Webcam: live view, camera choice (remembered), one click takes the photo -->
+<dialog id="cam-dlg">
+  <form method="dialog" class="dlg-box cam-box">
+    <h3 id="cam-title">Webcam</h3>
+    <select id="cam-device"></select>
+    <div class="cam-view"><video id="cam-video" autoplay playsinline muted></video><div class="cam-err" id="cam-err"></div></div>
+    <div class="crop-actions">
+      <span class="sub">Space also takes the photo</span>
+      <span class="spacer"></span>
+      <button value="cancel" formnovalidate>Cancel</button>
+      <button type="button" class="primary" id="cam-shoot">Take photo</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" hidden></div>
+
 <script src="app.js"></script>
+<script src="competitors.js"></script>
 </body>
 </html>

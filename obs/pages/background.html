@@ -20,6 +20,10 @@
   .image::after { content: ""; position: absolute; inset: 0; background: rgba(0, 0, 0, var(--bg-dim, 0.4)); }
   [data-bg="image"] .image { display: block; }
   [data-bg="image"] .pool, [data-bg="image"] .floor, [data-bg="solid"] .pool { display: none; }
+  /* transparent: nothing at all, OBS shows whatever is underneath (the rule above with !important is beaten by
+     the more specific selector) */
+  html[data-bg="none"], html[data-bg="none"] body { background: transparent !important; }
+  [data-bg="none"] .image, [data-bg="none"] .pool, [data-bg="none"] .floor, [data-bg="none"] .vignette { display: none; }
   .vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 40%, transparent 40%, rgba(0,0,0,0.65) 100%); }
   @keyframes drift1 { to { transform: translate(520px, 260px) scale(1.12); } }
   @keyframes drift2 { to { transform: translate(-560px, -220px) scale(0.92); } }

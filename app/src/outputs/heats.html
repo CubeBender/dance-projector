@@ -68,6 +68,7 @@ function render(state) {
   const mode = ['full', 'names', 'numbers'].includes(q.get('show')) ? q.get('show') : (state.heatsShow || 'full');
   const slot = state.slots?.[slotKey];
   applySide(document.body, slot);
+  document.body.classList.toggle('whole', !state.split);
   const comp = slot?.competition;
   const r = comp?.round;
   const dance = r?.dances?.[r.currentDance];

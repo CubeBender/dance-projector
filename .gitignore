@@ -19,6 +19,8 @@ Docs/judges/
 **/photos/
 judges.json
 config.json
+competitors.json
+pushed*.json
 
 # Media assets (logos, sponsor videos, judge photos) - kept outside git
 assets/

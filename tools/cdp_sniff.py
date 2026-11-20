@@ -84,7 +84,10 @@ async def main():
         await (await send("Network.enable", {"maxPostDataSize": 65536}))
         await (await send("Fetch.enable", {"patterns": [{"urlPattern": "*"}]}))
         if not ATTACH:
-            await (await send("Emulation.setDeviceMetricsOverride", {"width": 1920, "height": 1080, "deviceScaleFactor": 1, "mobile": False}))
+            # CDP_MOBILE="390x760" emulates a phone screen (used for the phone upload page); default is 1920x1080
+            mob = os.environ.get("CDP_MOBILE")
+            w, hgt = map(int, mob.split("x")) if mob else (1920, 1080)
+            await (await send("Emulation.setDeviceMetricsOverride", {"width": w, "height": hgt, "deviceScaleFactor": 2 if mob else 1, "mobile": bool(mob)}))
         if url != "-":
             await (await send("Page.navigate", {"url": url}))
         await asyncio.sleep(secs)

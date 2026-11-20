@@ -173,7 +173,7 @@ function renderOutputs() {
   sel.replaceChildren(...o.hosts.map((x) => h('option', { value: x, selected: x === prev }, x === 'localhost' ? 'This computer (localhost)' : `Network: ${x}`)));
   const host = sel.value || 'localhost';
   list.replaceChildren(...o.pages.map((p) => {
-    const url = `http://${host}:${o.port}${p.path}`;
+    const url = `http://${host}:${p.port || o.port}${p.path}`;
     return h('li', null,
       h('div', null, h('div', { class: 'name' }, p.name), h('div', { class: 'url' }, url)),
       h('button', { onclick: (e) => { navigator.clipboard.writeText(url); e.target.textContent = 'Copied'; setTimeout(() => (e.target.textContent = 'Copy'), 1200); } }, 'Copy'),
@@ -191,7 +191,9 @@ function cropImg(url, c) {
 // ---- crop editor ----
 // Edits the framing of one photo of one judge. crop.c = { x, y } focus point in percent and zoom 1–4.
 // It is saved for that photo only, so each photo of a judge keeps its own framing.
-const crop = { fedId: null, file: null, c: null };
+// The same dialog serves competitor photos (competitors.js openCompCrop): then kind is 'comp' and fedId holds
+// the competitor's key.
+const crop = { kind: 'judge', fedId: null, file: null, c: null };
 function showCrop() {
   const img = $('#crop-img'), c = crop.c;
   Object.assign(img.style, { objectPosition: `${c.x}% ${c.y}%`, transformOrigin: `${c.x}% ${c.y}%`, transform: `scale(${c.zoom})` });
@@ -199,6 +201,8 @@ function showCrop() {
 }
 // g = gallery row (galleryView in main.js), p = one of its photos
 function openCrop(g, p) {
+  crop.kind = 'judge';
+  $('#crop-frame').classList.remove('sq'); // judge cards are 3:4
   crop.fedId = g.fedId;
   crop.file = p.file;
   crop.c = { ...(p.crop || { x: 50, y: 30, zoom: 1 }) };
@@ -227,9 +231,11 @@ function openCrop(g, p) {
   const rotate = async (degrees) => {
     for (const b of [$('#crop-rot-left'), $('#crop-rot-right')]) b.disabled = true; // one turn at a time
     try {
-      const { state, file } = await window.dp.judgePhotoRotate(crop.fedId, crop.file, degrees);
+      const comp = crop.kind === 'comp';
+      const { state, file } = await (comp ? window.dp.compPhotoRotate : window.dp.judgePhotoRotate)(crop.fedId, crop.file, degrees);
       apply(state);
-      const p = file && state.gallery.find((g) => g.fedId === crop.fedId)?.photos.find((x) => x.file === file);
+      const owner = comp ? state.competitors.find((c) => c.key === crop.fedId) : state.gallery.find((g) => g.fedId === crop.fedId);
+      const p = file && owner?.photos.find((x) => x.file === file);
       if (p) { crop.file = p.file; crop.c = { x: 50, y: 30, zoom: 1 }; $('#crop-img').src = p.url; showCrop(); }
     } finally { for (const b of [$('#crop-rot-left'), $('#crop-rot-right')]) b.disabled = false; }
   };
@@ -237,7 +243,8 @@ function openCrop(g, p) {
   $('#crop-rot-right').addEventListener('click', () => rotate(90));
   // Saved from the form's submit, which fires at once (the dialog "close" event can arrive late).
   $('#crop form').addEventListener('submit', (e) => {
-    if (e.submitter?.value === 'save' && crop.fedId) window.dp.judgeCrop(crop.fedId, crop.c, crop.file).then(apply);
+    if (e.submitter?.value !== 'save' || !crop.fedId) return;
+    (crop.kind === 'comp' ? window.dp.compCrop : window.dp.judgeCrop)(crop.fedId, crop.c, crop.file).then(apply);
   });
 })();
 
@@ -385,6 +392,35 @@ const PANEL_SOURCE = {
 };
 const psearch = { A: '', B: '' }; // search text of each side's gallery picker
 
+// ---- order of the judge cards on screen (panels.js sortJudges in the main process) ----
+const SORT_LABELS = { surname: 'Surname', firstname: 'First name', letter: 'Letter (DanS order)', custom: 'Custom' };
+// "Order on screen" chips of one side
+function sortChips(k) {
+  const cur = S.config.slots[k].judgeSort || 'surname';
+  return h('div', { class: 'order-head' }, h('b', null, 'Order on screen'),
+    h('div', { class: 'chips' }, Object.entries(SORT_LABELS).map(([mode, label]) => h('button', {
+      class: 'chip' + (cur === mode ? ' active' : ''),
+      title: mode === 'custom' ? 'Arrange the judges yourself with the arrows' : `Sort the judge cards by ${label.toLowerCase()}`,
+      onclick: () => window.dp.setJudgeSort(k, mode).then(apply),
+    }, label))));
+}
+// Up / down buttons of the judge at position i of n; pressing one switches the side to the custom order
+function moveButtons(k, fedId, i, n) {
+  return h('span', { class: 'mv' },
+    h('button', { class: 'ghost', disabled: i === 0 ? '' : null, title: 'Move one place earlier', onclick: () => window.dp.judgeMove(k, fedId, -1).then(apply) }, '\u2191'),
+    h('button', { class: 'ghost', disabled: i === n - 1 ? '' : null, title: 'Move one place later', onclick: () => window.dp.judgeMove(k, fedId, 1).then(apply) }, '\u2193'));
+}
+// The panel of a DanS side as the screen will show it, with the arrows
+function orderList(k) {
+  const list = S.screenOrder?.[k] || [];
+  if (!list.length) return null;
+  return h('ol', { class: 'order-list' }, list.map((j, i) => h('li', { class: 'own-row order-row' },
+    h('span', { class: 'pos' }, i + 1),
+    h('span', { class: 'pj-ph' }, j.photo ? cropImg(j.photo, j.crop) : null),
+    h('span', { class: 'pj-name' }, j.name, j.letter ? h('small', null, ` \u00b7 ${j.letter}`) : null),
+    moveButtons(k, j.fedId, i, list.length))));
+}
+
 function renderPanels() {
   const wrap = $('#panels');
   // don't redraw under the cursor while a field (letter, title, search) is being typed in
@@ -422,8 +458,10 @@ function manualBlock(k) {
     field('titleEn', 'Competition (second language)', 'optional'),
     field('round', 'Round', 'optional, e.g. Finále'));
 
-  // chosen judges sorted by letter; the letter can be changed (Enter or leaving the field saves it)
-  const rows = chosen.slice().sort((a, b) => a.letter.localeCompare(b.letter, 'cs')).map((j) => {
+  // chosen judges in the order the screen shows them; the arrows rearrange them, and the letter can be changed
+  // (Enter or leaving the field saves it). Letters are no longer shown on screen but still drive "Letter" order.
+  const pos = new Map((S.screenOrder?.[k] || []).map((j, i) => [j.fedId, i]));
+  const rows = chosen.slice().sort((a, b) => (pos.get(a.fedId) ?? 999) - (pos.get(b.fedId) ?? 999)).map((j, i, all) => {
     const g = byId.get(j.fedId);
     const main = g.photos.find((p) => p.file === g.main);
     const letter = h('input', { class: 'own-letter', value: j.letter, maxlength: '3', title: 'Judge letter shown on screen' });
@@ -432,6 +470,7 @@ function manualBlock(k) {
       h('span', { class: 'pj-ph' }, main ? cropImg(main.url, main.crop) : null),
       letter,
       h('span', { class: 'pj-name' }, g.displayName || judgeName(g)),
+      moveButtons(k, j.fedId, i, all.length),
       h('button', { class: 'ghost', title: 'Remove from the selection', onclick: () => window.dp.manualToggle(k, j.fedId).then(apply) }, '×'));
   });
   const letters = chosen.map((j) => j.letter);
@@ -464,6 +503,7 @@ function manualBlock(k) {
         dup.length ? h('span', { class: 'err' }, `Letter ${[...new Set(dup)].join(', ')} is used twice`) : null,
         h('span', { class: 'count' }),
         chosen.length ? h('button', { class: 'ghost', onclick: () => window.dp.manualClear(k).then(apply) }, 'Clear') : null),
+      sortChips(k),
       rows.length ? h('div', { class: 'own-rows' }, rows) : h('p', { class: 'hint' }, 'Click judges below to add them. Letters are given A, B, C… and can be changed.'),
       gallery.length
         ? [h('div', { class: 'own-pick-head' }, h('b', null, 'Gallery'), search), h('div', { class: 'pick' }, buttons)]
@@ -481,7 +521,9 @@ function dansBlock(k, slot) {
       ? (S.config.split ? `Nothing on side ${k}. Use the ${k} buttons in Competitions.` : 'Nothing on screen. Press Show in Competitions.')
       : 'No DanS data. Use Own selection to pick judges from the gallery.'));
   if (!c) return { title, parts: [] };
-  return { title, parts: dansParts(c) };
+  // DanS panel: tools, the order on screen (with arrows), then every judge of the event to add or remove
+  const [tools, grid] = dansParts(c);
+  return { title, parts: [tools, sortChips(k), orderList(k), h('div', { class: 'own-pick-head' }, h('b', null, 'Judges of the event')), grid].filter(Boolean) };
 }
 
 function dansParts(c) {
@@ -522,10 +564,19 @@ function renderStyle() {
   thumb.style.backgroundImage = t.imageUrl ? `url("${t.imageUrl}")` : '';
   thumb.textContent = t.imageUrl ? '' : 'Drop an image here or click to choose';
   $('#bg-remove').hidden = !t.image;
+  $('#bg-none-hint').hidden = t.background !== 'none';
+  // ready-made styles (theme.js PRESETS); the one matching the current colours is marked
+  const same = (p) => Object.entries(p.theme).every(([key, v]) => String(t[key]).toUpperCase() === String(v).toUpperCase());
+  $('#presets').replaceChildren(...(S.presets || []).map((p) => h('button', {
+    class: 'chip' + (same(p) ? ' active' : ''), title: 'Use the colours of ' + p.name,
+    onclick: () => window.dp.themePreset(p.id).then(apply),
+  }, h('span', { class: 'sw', style: `background:${p.theme.accent}` }), h('span', { class: 'sw', style: `background:${p.theme.ground}` }), p.name)));
+  // transparent background: the previews show a checkerboard where OBS will show its own background
+  $$('.pv').forEach((el) => el.classList.toggle('transparent', t.background === 'none'));
 }
 // Colours are sent when the picker closes ("change"); sliders while dragging, so the preview follows.
 for (const el of $$('[data-theme]')) {
-  const send = () => window.dp.setTheme({ [el.dataset.theme]: el.type === 'range' ? Number(el.value) : el.value }).then(apply);
+  const send = () => window.dp.setTheme({ [el.dataset.theme]: el.type === 'range' || el.type === 'number' ? Number(el.value) : el.value }).then(apply);
   el.addEventListener(el.type === 'range' ? 'input' : 'change', send);
 }
 $('#bg-kind').addEventListener('click', (e) => {
@@ -547,6 +598,7 @@ $('#theme-reset').addEventListener('click', () => window.dp.themeReset().then(ap
 // ---- Projection box ----
 let fetching = false;                       // a Fetch now is running (keeps its button disabled)
 let previewPath = '/out/judges.html?slot=A'; // page shown in the two previews
+let previewPort = null;                      // its port when it is not the judges' server (competitors, C-32)
 function renderProjection() {
   const p = S.projection;
   $('#proj-auto').checked = p.auto;
@@ -564,7 +616,7 @@ function renderProjection() {
   const sel = $('#preview-page');
   const pages = S.outputs?.pages || [];
   if (sel.options.length !== pages.length) {
-    sel.replaceChildren(...pages.map((pg) => h('option', { value: pg.path, selected: pg.path === previewPath }, pg.name)));
+    sel.replaceChildren(...pages.map((pg) => h('option', { value: `${pg.port || ''}|${pg.path}`, selected: pg.path === previewPath && (pg.port || null) === previewPort }, pg.name)));
   }
   renderPreviews(false);
 }
@@ -573,14 +625,16 @@ function renderProjection() {
 // server themselves, so they are only rebuilt when the page choice changes.
 function renderPreviews(force) {
   if (!S.outputs) return;
+  // the competitor page is shown from its own server, whose draft/pushed are the competitor ones
+  const base = previewPort ? `http://localhost:${previewPort}` : S.outputs.base;
   for (const [id, view] of [['#pv-draft', 'draft'], ['#pv-live', 'live']]) {
     const box = $(id);
     const sep = previewPath.includes('?') ? '&' : '?';
-    const src = `${S.outputs.base}${previewPath}${sep}view=${view}`;
+    const src = `${base}${previewPath}${sep}view=${view}`;
     if (!force && box.dataset.src === src) continue;
     box.dataset.src = src;
     box.replaceChildren(
-      h('iframe', { src: `${S.outputs.base}/brand/background.html?view=${view}`, tabindex: '-1', scrolling: 'no' }),
+      h('iframe', { src: `${base}/brand/background.html?view=${view}`, tabindex: '-1', scrolling: 'no' }),
       h('iframe', { src, tabindex: '-1', scrolling: 'no' }));
   }
 }
@@ -590,6 +644,7 @@ function apply(state) {
   S = state;
   renderBar(); renderComps(); renderSlots(); renderOutputs(); renderJudges(); renderSettings();
   renderPanels(); renderStyle(); renderProjection();
+  renderCompetitors(); renderCompProjection(); // competitors.js
 }
 
 // events
@@ -647,6 +702,15 @@ $('#running-states').addEventListener('change', (e) => window.dp.setOption({ run
 $$('.tab').forEach((t) => t.addEventListener('click', () => {
   $$('.tab').forEach((x) => x.classList.toggle('active', x === t));
   for (const x of $$('.tab')) $('#tab-' + x.dataset.tab).hidden = x !== t;
+  // the previews follow: competitor page on the Competitors tab, the judge page when leaving it
+  const compPage = S?.outputs?.pages.find((p) => p.port);
+  const onComp = t.dataset.tab === 'competitors';
+  if (compPage && onComp !== !!previewPort) {
+    previewPath = onComp ? compPage.path : '/out/judges.html?slot=A';
+    previewPort = onComp ? compPage.port : null;
+    $('#preview-page').value = `${previewPort || ''}|${previewPath}`;
+    renderPreviews(true);
+  }
 }));
 $('#modes').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) window.dp.setMode(b.dataset.mode).then(apply); });
 $('#fetch-now').addEventListener('click', async (e) => {
@@ -657,7 +721,11 @@ $('#fetch-now').addEventListener('click', async (e) => {
 });
 $('#push').addEventListener('click', () => window.dp.push().then(apply));
 $('#proj-auto').addEventListener('change', (e) => window.dp.setProjectionAuto(e.target.checked).then(apply));
-$('#preview-page').addEventListener('change', () => { previewPath = $('#preview-page').value; renderPreviews(true); });
+$('#preview-page').addEventListener('change', () => {
+  const [port, path] = $('#preview-page').value.split('|');
+  previewPath = path; previewPort = port ? Number(port) : null;
+  renderPreviews(true);
+});
 
 window.dp.onState(apply);
 window.dp.onStatus((st) => { if (S) { S.status = st; renderStatus(); } });

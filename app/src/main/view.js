@@ -4,6 +4,8 @@
 const { buildHeats } = require('./model');
 const { themeFor, themeView } = require('./theme');
 const { mainPhoto } = require('./gallery');
+const { sortJudges } = require('./panels');
+const { fromStartlist, mergeCompetitors, findByNumber, screenName, numberKey } = require('./competitors');
 
 // Crop is { x, y } in percent (focus point) and zoom >= 1. Missing crop = centred, upper third.
 function cleanCrop(c) {
@@ -38,17 +40,35 @@ function judgeView(j, store) {
 // DanS connection and no event. Judges deleted from the gallery drop out.
 function manualCompetition(key, store) {
   const m = store.cfg.manualPanels?.[key] || {};
-  const judges = (m.judges || [])
-    .filter((j) => Object.keys(store.judge(j.fedId)).length)
-    .map((j) => judgeView({ fedId: j.fedId, letter: j.letter || '' }, store))
-    .sort((a, b) => a.letter.localeCompare(b.letter, 'cs'));
   return {
     id: `manual-${key}`, manual: true,
     number: m.number || null, title: m.title || '', titleEn: m.titleEn || '', titleShort: '',
     state: null, running: false,
     round: m.round ? { name: m.round, competes: null, advances: null, currentDance: -1, dances: [] } : null,
-    judges,
+    judges: slotJudges(key, null, store).map((x) => x.view),
   };
+}
+
+// The judges of one screen side in the order they appear on screen, as [{ fedId, view }].
+// view is what the output pages draw (judgeView); fedId (IDT) stays here, it is not sent to the pages.
+// Own selection: the gallery judges picked for the side (judges deleted from the gallery drop out).
+// From DanS: the panel of the competition shown on the side (hand-edited or as drawn).
+// The order is the side's "judgeSort" setting (panels.js sortJudges); used by the output and the window alike.
+function slotJudges(key, model, store) {
+  const s = store.cfg.slots[key];
+  let list;
+  if (s.source === 'manual') {
+    list = (store.cfg.manualPanels?.[key]?.judges || [])
+      .filter((j) => Object.keys(store.judge(j.fedId)).length)
+      .map((j) => ({ fedId: j.fedId, letter: j.letter || '' }));
+  } else {
+    list = model?.competitions.find((c) => c.id === s.competitionId)?.judges || [];
+  }
+  const items = list.map((j) => ({ fedId: j.fedId, view: judgeView(j, store) }));
+  // sort on the names as shown (gallery names win over DanS), keeping the IDT for the custom order
+  const sorted = sortJudges(items.map((x) => ({ ...x, letter: x.view.letter, firstName: x.view.firstName, surname: x.view.surname })),
+    s.judgeSort || 'surname', s.order || []);
+  return sorted.map(({ fedId, view }) => ({ fedId, view }));
 }
 
 function slotView(key, model, raw, store, theme) {
@@ -75,7 +95,7 @@ function slotView(key, model, raw, store, theme) {
         dances: comp.round.dances.map((d, i) => ({ name: d.name, nameCs: d.nameCs, nameEn: d.nameEn, abbr: d.abbr, completed: d.completed,
           heats: heats?.dances?.[i]?.heats || [] })),
       },
-      judges: comp.judges.map((j) => judgeView(j, store)),
+      judges: slotJudges(key, model, store).map((x) => x.view),
     },
   };
 }
@@ -113,4 +133,69 @@ function outputState(model, raw, store, status) {
   };
 }
 
-module.exports = { outputState, judgeView, cleanCrop };
+// ---------------------------------------------------------------------------------------------------------
+// Competitors (decision D-22)
+// ---------------------------------------------------------------------------------------------------------
+
+// Every competitor of the current event: DanS start list merged with what is stored in the app (competitors.js).
+// Works without DanS data (only stored entries then).
+// A competitor without a photo of its own shows the photo the same dancer(s) have in the other event of a two-day
+// competition (found by IDT, C-38) – marked `borrowed`, so the window can say so. A photo added here wins.
+function competitorList(raw, store) {
+  return mergeCompetitors(fromStartlist(raw?.startlist, raw?.draws), store.storedCompetitors()).map((c) => {
+    if (c.photos.length) return c;
+    const other = store.photosFromOtherEvent(c.people.map((p) => p.idt));
+    return other ? { ...c, photos: other.photos, main: other.main, borrowed: other.eventKey } : c;
+  });
+}
+
+// One competitor card as the output page draws it. The page never gets IDTs or clubs, only what it shows.
+function competitorView(c) {
+  const portrait = mainPhoto(c);
+  const n = screenName(c);
+  return {
+    number: Number(c.number), kind: c.kind, first: n.first, last: n.last, surnames: n.surnames,
+    photo: portrait ? `/photos/${encodeURIComponent(portrait.file)}` : null,
+    crop: cleanCrop(portrait?.crop),
+  };
+}
+
+// Header of the competitor screen: the DanS competition picked (number, titles, the round the numbers came from),
+// overridden field by field by what was typed. null when there is nothing to say.
+function competitorHeader(model, scr) {
+  const comp = model?.competitions.find((c) => c.id === scr.competitionId) || null;
+  const h = {
+    number: scr.number || comp?.number || null,
+    title: scr.title || comp?.title || '',
+    titleEn: scr.titleEn || (scr.title ? '' : comp?.titleEn || ''),
+    round: scr.round || scr.roundName || '',
+  };
+  return h.number || h.title || h.titleEn || h.round ? h : null;
+}
+
+// What the competitor projection draws (/out/competitors.html on the competitor port).
+//   screen.competitors – the round's competitors, sorted by number; a number nobody has yet still gets a card
+//   screen.spotlight   – the one competitor of spotlight mode (null when none is picked or it's not in the round)
+function competitorState(model, raw, store) {
+  const scr = store.cfg.competitorScreen || {};
+  const list = competitorList(raw, store);
+  // the round is a list of start numbers; each is looked up among the competitors that have that number
+  const competitors = (scr.numbers || []).map(numberKey).filter(Boolean)
+    .sort((a, b) => a - b)
+    .map((n) => competitorView({ ...(findByNumber(list, n) || { kind: 'solo', people: [] }), number: n }));
+  const spot = numberKey(scr.spotlight);
+  return {
+    theme: themeView(themeFor(store.cfg, store.cfg.eventId)),
+    language: store.cfg.language,
+    event: model?.event ? { name: model.event.name, location: model.event.location, date: model.event.date } : null,
+    updated: Date.now(),
+    screen: {
+      header: competitorHeader(model, scr),
+      mode: scr.mode === 'spotlight' ? 'spotlight' : 'round',
+      competitors,
+      spotlight: (spot && competitors.find((c) => String(c.number) === spot)) || null,
+    },
+  };
+}
+
+module.exports = { outputState, judgeView, cleanCrop, slotJudges, competitorList, competitorState, competitorView };

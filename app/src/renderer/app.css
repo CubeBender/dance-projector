@@ -235,3 +235,79 @@ button.danger-fill { background: var(--err); border-color: var(--err); color: #f
 .own-pick-head { display: flex; align-items: center; gap: 12px; margin: 8px 0 8px; }
 .own-search { width: 220px; }
 .pick-j[hidden] { display: none; }
+
+/* Order on screen (Judge selection tab) */
+.order-head { display: flex; align-items: center; gap: 10px; margin: 8px 0; flex-wrap: wrap; }
+.order-list { list-style: none; margin: 0 0 12px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px; }
+.own-row.order-row { grid-template-columns: 22px 30px 1fr auto; }
+.order-row .pos { font: 700 15px "Bahnschrift", sans-serif; color: var(--muted); text-align: right; }
+.order-row small { color: var(--muted); }
+.own-row { grid-template-columns: 30px 48px 1fr auto auto; }
+.mv { display: inline-flex; gap: 2px; }
+.mv button { padding: 2px 7px; }
+.mv button:disabled { opacity: 0.3; }
+/* Style tab: preset chips with two colour swatches */
+.presets { margin-bottom: 10px; flex-wrap: wrap; }
+.presets .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; border: 1px solid rgba(255,255,255,0.25); }
+.presets .chip .sw:last-of-type { margin-right: 7px; }
+/* transparent style: a checkerboard stands in for the OBS background in the previews */
+.pv.transparent { background: repeating-conic-gradient(#2a2d33 0 25%, #1c1e22 0 50%) 0 0 / 16px 16px; }
+
+/* ---- Competitors tab (D-22) ---- */
+.proj-name { font: 600 12px "Bahnschrift", sans-serif; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-top: 6px; }
+#cscreen .pnl-head, #cphone .pnl { gap: 12px; }
+#cscreen select { max-width: 460px; }
+.cnums { width: 100%; font: 600 16px "Bahnschrift", sans-serif; letter-spacing: 0.04em; }
+.warn { color: var(--warn); font-size: 12.5px; }
+.pnl-tools .src.dans { font-size: 12.5px; }
+.spot-pick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.pick-c { padding: 4px 10px; opacity: 0.7; }
+.pick-c.on { opacity: 1; border-color: var(--c); background: color-mix(in srgb, var(--c) 18%, var(--panel-2)); }
+.pick-c b { font-family: "Bahnschrift", sans-serif; }
+/* phone upload box: QR code left, explanation right */
+.phone-box { display: grid; grid-template-columns: 180px 1fr; gap: 16px; align-items: start; }
+.qr { width: 180px; height: 180px; border-radius: 8px; background: #fff; image-rendering: pixelated; }
+.phone-info { display: grid; gap: 8px; align-content: start; }
+.phone-info p { margin: 0; }
+.phone-info .url { word-break: break-all; color: var(--muted); font-size: 12px; }
+.notices { margin: 0; padding-left: 18px; font-size: 12.5px; color: var(--run); }
+/* competitor cards */
+.ccards { display: grid; grid-template-columns: repeat(auto-fill, minmax(460px, 1fr)); gap: 10px; }
+.ccard { display: grid; grid-template-columns: 120px 1fr; gap: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px; cursor: default; }
+.ccard.inround { border-color: #5b4a2a; }
+.ccard.sel { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(76,141,255,0.35); }
+.ccard .ph { width: 120px; height: 160px; }
+.ccard .ph.sq { height: 120px; }               /* couples are square on screen */
+.cnum { position: absolute; left: 6px; bottom: 6px; font: 700 18px "Bahnschrift", sans-serif; background: #f3f5f9; color: #0b0d12; border-radius: 4px; padding: 0 6px; z-index: 1; }
+.person { display: grid; grid-template-columns: 1fr 1fr 92px auto; gap: 6px; }
+.person input { width: 100%; min-width: 0; }
+.person button { padding: 3px 8px; font-size: 12px; }
+.chips.mini .chip { padding: 1px 8px; font-size: 11.5px; }
+.ccard .jtop { justify-content: space-between; align-items: center; }
+.tag.round { color: #e6c27a; background: rgba(230,194,122,0.12); }
+.cnote { min-height: 0; }
+.cnote:empty { display: none; }
+.err.ok { color: var(--run); }
+/* dialogs */
+.dlg-box.wide { width: 520px; }
+.nc-top { display: flex; align-items: end; gap: 16px; margin-bottom: 10px; }
+.nc-top input { width: 110px; font: 600 18px "Bahnschrift", sans-serif; }
+#nc-people { display: grid; gap: 6px; }
+.paste-img { display: block; max-width: 100%; max-height: 260px; margin: 8px auto; border-radius: 8px; }
+#paste-number { font: 600 22px "Bahnschrift", sans-serif; }
+.cam-box { width: 720px; }
+.cam-box select { width: 100%; margin: 6px 0 8px; }
+.cam-view { position: relative; background: #000; border-radius: 8px; overflow: hidden; aspect-ratio: 16 / 9; }
+.cam-view video { width: 100%; height: 100%; object-fit: contain; display: block; }
+.cam-err { position: absolute; inset: auto 0 0 0; padding: 8px 12px; color: var(--err); background: rgba(0,0,0,0.6); }
+.cam-err:empty { display: none; }
+.crop-frame.sq { height: 300px; }              /* framing a couple photo: square like the card on screen */
+/* message strip at the bottom of the window */
+.toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); max-width: 70vw; padding: 10px 16px; border-radius: 8px; background: #22324d; color: var(--text); border: 1px solid #34507f; box-shadow: 0 6px 24px rgba(0,0,0,0.5); z-index: 50; }
+.toast.err { background: #3d1c22; border-color: #7a2f3a; }
+/* competitors without a start number yet (D-23), borrowed photos from the other event (C-38) */
+.cnum.none { font-size: 11px; font-weight: 600; background: #3a3f4a; color: var(--muted); padding: 2px 6px; }
+.ph.borrowed img { opacity: 0.75; }
+.ph.borrowed { border-style: dashed; }
+.tag.bad { color: var(--err); background: rgba(255,93,108,0.12); }
+.cnum-input { width: 70px; font: 600 15px "Bahnschrift", sans-serif; margin-left: 8px; }

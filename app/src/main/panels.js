@@ -60,4 +60,42 @@ function toggleManual(list = [], fedId) {
   return list.some((j) => j.fedId === fedId) ? list.filter((j) => j.fedId !== fedId) : [...list, { fedId, letter: nextLetter(list) }];
 }
 
-module.exports = { applyPanels, togglePanel, cleanLetter, nextLetter, toggleManual };
+// ---- order of the judges on screen ----
+// The judge cards no longer show letters, so the order is the operator's choice, per screen side:
+//   'surname'   – by surname, then first name (Czech alphabet: Č after C, CH after H, Ř after R …)
+//   'firstname' – by first name, then surname
+//   'letter'    – by judge letter, which is the DanS order
+//   'custom'    – the order the operator arranged with ↑ / ↓ (a list of IDTs)
+const SORTS = ['surname', 'firstname', 'letter', 'custom'];
+const collator = new Intl.Collator('cs', { sensitivity: 'base', numeric: true });
+
+// list: items with { fedId, letter, firstName, surname } (more fields are kept as they are).
+// order: IDTs in the custom order. Judges missing from it (newly added to the panel) go to the end,
+// by surname, so adding a judge never shuffles the ones already arranged.
+// Returns a new array; the input is not changed.
+function sortJudges(list, mode = 'surname', order = []) {
+  const bySurname = (a, b) => collator.compare(a.surname || '', b.surname || '') || collator.compare(a.firstName || '', b.firstName || '');
+  const cmp = {
+    surname: bySurname,
+    firstname: (a, b) => collator.compare(a.firstName || '', b.firstName || '') || collator.compare(a.surname || '', b.surname || ''),
+    letter: (a, b) => collator.compare(a.letter || '', b.letter || '') || bySurname(a, b),
+    custom: (a, b) => {
+      const ia = order.indexOf(a.fedId), ib = order.indexOf(b.fedId);
+      // -1 (not in the list) counts as "after everything"
+      return (ia < 0 ? Infinity : ia) - (ib < 0 ? Infinity : ib) || bySurname(a, b);
+    },
+  }[SORTS.includes(mode) ? mode : 'surname'];
+  // Infinity - Infinity is NaN; treat it as "equal" so the surname tie-break decides
+  return list.slice().sort((a, b) => cmp(a, b) || 0);
+}
+
+// Moves one judge up (delta -1) or down (+1) in an already ordered list of IDTs. Returns a new list.
+function moveInOrder(ids, fedId, delta) {
+  const i = ids.indexOf(fedId), j = i + delta;
+  if (i < 0 || j < 0 || j >= ids.length) return ids.slice();
+  const out = ids.slice();
+  [out[i], out[j]] = [out[j], out[i]];
+  return out;
+}
+
+module.exports = { applyPanels, togglePanel, cleanLetter, nextLetter, toggleManual, SORTS, sortJudges, moveInOrder };

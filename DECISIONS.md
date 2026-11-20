@@ -71,6 +71,28 @@ Claude's decision log. Questions that need the user are asked in the conversatio
 - **Decision:** the Judge panel tab becomes **Judge selection**. Each screen side chooses **From DanS** (as before) or **Own selection**: judges picked from the gallery with letters A, B, C… given automatically and editable, plus an optional competition number, title (two languages) and round typed by hand. It needs no DanS data and no event, and goes through Push like everything else. **Delete judge…** on gallery cards asks in a window that lists what is removed.
 - **Changes D-14:** manual work no longer depends on a judge list read from DanS ahead; the gallery is enough.
 
+### D-20 Output look for MČR SÓLO (2026-11-19)
+- **Asked by the user:** transparent background so the background is added in OBS; colours from the MČR event (primary #BD9C66, secondary #1F1917, from `OBS_transition/CLAUDE.md`); no letters on the judge cards; choose how judges are sorted (custom, by surname, …); bigger header in the theme colours.
+- **Decision:** see C-27 to C-29. The output pages were already transparent (only the plates behind text are drawn); the new **Transparent** background type also empties the Background page.
+- **Changes D-15:** a fourth background type (none), a text colour in the style, and ready-made event styles.
+
+### D-21 Judge cards fill the free middle; room for the sponsor strip (2026-11-19)
+- **Asked by the user:** cards about 20 % bigger. Claude pointed out that 9 judges in one row already use the full width. User's answer: scale the cards dynamically by the number of judges and the space available; keep the bottom 120 px (OBS sponsor strip) plus a small buffer clear; the header mirrors that at the top; the judges fill the middle.
+- **Decision:** see C-30.
+
+### D-22 Competitors in semifinals and finals (2026-11-20)
+- **Asked by the user:** show photos and names of the competitors in semifinals and finals, like the judges. Solo: photo, full name, number. Couple: photo, both surnames, number. Own tab in the app; own projection, possibly on its own port. Competitors from DanS, typed by hand, or looked up at ČSTS by IDT. Photos by drag and drop, file picker, WhatsApp (automatically if possible) or the Logitech webcam.
+- **Asked: how do photos get from the organizer into the app?** Claude explained that WhatsApp cannot be watched officially (WhatsApp Desktop saves nothing to a folder by itself, file names carry no start number), and that a bot on WhatsApp Web breaks WhatsApp's terms and risks a ban of the user's number. **Answer:** paste (Ctrl+V) or drag from WhatsApp Desktop, **plus a phone upload page** served by the app: the organizer scans a QR code, takes the photo, types the number, and it lands on that competitor.
+- **Asked: what does the competitor projection show?** **Answer:** the whole round at once (like the judge panel) **and** a single-competitor spotlight.
+- **Asked: how does the app know who dances in the round?** **Answer:** from the DanS round (fetched on demand) or numbers typed by hand; reviewed, then pushed.
+- **ČSTS credentials (user, 2026-11-20):** the user offered their ČSTS account in case the API needs a login. Not needed: the public member lookup answers without one (C-33). Revisit only if ČSTS closes it.
+
+### D-23 Start numbers only from DanS; two events, two days (2026-11-20)
+- **Reported by the user:** after fetching from DanS, competitors showed start numbers although none were given yet; real numbers are given later by competition staff in DanS, so the app must not show a number DanS doesn't have.
+- **What Claude found:** neither DanS nor the app had made numbers. The app was still on the old Pardubice event (CS1761, 2026-10-17), whose 16 numbered competitors were checked in back then (same numbers as in the October snapshot). The new event CS1747 has 283 competitors and no numbers. The real problem was the opposite: the app identified competitors by number only, so it would have listed none of them and nothing could be prepared ahead.
+- **Decision:** competitors are identified by their DanS entry (C-37); a number is shown only when DanS has one; **Refresh start list** picks numbers up later.
+- **Also told by the user:** the championship is two DanS events – Saturday: Mistrovství ČR v latinskoamerických tancích sólo; Sunday: Mistrovství ČR ve standardních tancích sólo + vyhlášení MČR 10T sólo – and a competitor's number can differ between the days. **Decision:** photos follow the dancer between the two events by IDT (C-38).
+
 ## Claude's decisions
 
 ### C-01 Technology: Electron with plain JavaScript, no framework or build step
@@ -181,3 +203,52 @@ Claude's decision log. Questions that need the user are asked in the conversatio
 ## Changes
 
 - **2026-10-17 – how this file is used.** Before: open questions were listed here as "Pending" for the user to go through. After: questions are asked in the conversation and only recorded here. **Reason:** the user clarified the file is for Claude to keep track. Former P-03 became D-06 (verified); P-06, P-08 and P-10 were asked and became D-07–D-09 and C-07; P-01, P-02, P-04, P-05, P-07, P-09 became Claude's decisions C-01–C-06.
+
+### C-27 MČR style as a preset
+- **Decision:** the Style tab gets an **Event colours** row with a one-click preset "MČR SÓLO 2026": accent #BD9C66, panels and background #1F1917, text and second colour #E8D6A6 (the cream of the event poster), panel opacity 88 %, background Transparent. It is applied to the current event's style like any manual edit (and goes out with Push). New style field `text`; the quieter text colour, plate edge, number card and ink on coloured fills are derived from the style in `common.js` instead of fixed blue-grey/white values.
+- **Why:** the style is per event already (D-15), so a preset avoids typing hex codes on the day and keeps other events unchanged. Cream text instead of white matches the event's own materials. Deriving the secondary colours keeps every page readable for any accent (dark ink on light accents like gold, white on dark ones).
+
+### C-28 Judge order on screen
+- **Decision:** per screen side (`slots.X.judgeSort`): **Surname** (default), **First name**, **Letter (DanS order)**, **Custom**. Sorting uses the Czech collation (Č after C, CH after H). Custom order is a list of IDTs (`slots.X.order`) changed with ↑ / ↓; pressing an arrow switches the side to Custom, starting from the order shown at that moment. Judges not in the list go last by surname. Works for DanS panels and own selections; the Judge selection tab shows the panel in screen order. Letters stay in the app (DanS letter, own-selection letter) because Letter order uses them.
+- **Why:** with letters gone from the cards, letter order looks random to the audience; surname is the usual order for printed panels. A per-side list of IDTs is simple and survives switching competitions (unknown IDTs are ignored).
+
+### C-29 Header and judge cards
+- **Decision:** header about 35 % larger (number card 132 px, title 76 px, round 36 px in the accent colour, side chip 30 px), 14 px side bar and a thin accent line at the bottom. Number cards are drawn in the accent colour with dark ink (formerly white). Judge cards: no letter; a thin accent line between photo and name; "Judges · n" in the accent colour. The card grid leaves room for the taller header.
+- **Why:** the user's request; the accent card ties the header to the event colours while staying the "back-number" signature of the design.
+
+### C-30 Card fitting and strip margin
+- **Decision:** style field `strip` (px, per event, 0 = none; MČR preset 120). The pages keep strip + 24 px free at the bottom and 24 px at the top (without a strip: 56 px both, as before); applies to judges, floor overview, schedule, heats and lower third. The judges page measures the real free area and tries every number of rows with the judges spread evenly (14 = 7 + 7), keeping the layout with the widest cards (max 440 px); a shorter last row is centred. When the width is the limit (a long single row), spare height goes 60 % into a taller photo (up to 5:8) and 40 % into bigger name text (up to 1.35×); the text steps back down if a surname would be cut.
+- **Why:** measuring instead of estimating keeps it right when the header, languages or strip change. Taller photos and bigger names use the space a single row leaves, which is where the "20 % bigger" can actually come from. Checked: 4 judges ≈ 305 px wide, 9 ≈ 179 px with taller photos and larger names, 14 in two rows of 7, all clear of the strip.
+
+### C-31 Competitor list per event, keyed by start number
+- **Decision:** `competitors.json` in the app data folder, `{ "<event key>": { "<number>": entry } }`, event key as for styles (`_none` without an event). Entry: `kind` solo/couple, `people[{ name, surname, idt }]`, `club`, `photos[{ file, hash, crop }]`, `main` (same photo shape as the judge gallery, so the crop editor and rotate buttons work unchanged). DanS start-list entries are shown merged with it; anything typed in the app wins over DanS, like judge names.
+- **Why:** start numbers belong to one event, and the organizer refers to competitors by number. Keeping photos per event avoids a 2025 photo showing up at a 2026 event under the same number.
+
+### C-32 Own port and own Push for competitors
+- **Decision:** a second output server on port **8788** (`competitorPort`) serves `/out/competitors.html` and its own `/api/state`. It has its own draft / pushed pair (`pushed-competitors.json`) and its own **Push competitors** button; "send every change automatically" covers both. Judges stay on 8787, unchanged.
+- **Why:** the user asked for a port per projection. A separate push keeps a half-prepared final from leaving with a judge panel push, and the other way round.
+
+### C-33 ČSTS lookup by IDT
+- **Decision:** `GET https://www.csts.cz/api/members/{IDT}` (public, no login) gives `name`, `surname`, `clubName`. Fallback `GET /api/1/athletes/{IDT}` (one `name` string, "Surname Name"). One request at a time, only when the operator presses Find, answers kept for the session. ČSTS answers `429` when asked too often; the app then says to wait a minute. Only the IDT is sent.
+- **Why:** checked on 2026-11-20 against the live site; the members endpoint has the fields split, so double surnames need no guessing.
+
+### C-34 Phone upload page
+- **Decision:** off by default. When switched on in the Competitors tab, the competitor server (8788) also serves `/upload?key=<random>` with a QR code in the app. The page opens the phone camera (`capture`), asks for the start number, shows who that is, shrinks the photo on the phone and posts it. Requests without the right key are refused; the key changes with **New link**; only images up to 20 MB. A photo for an unknown number creates a competitor with just that number (flagged in the list). Every received photo is re-encoded like judge photos and becomes that competitor's main photo; the window shows a notice.
+- **Why:** this is the "automatic by number" the user wanted without touching WhatsApp. The key keeps other people on the venue Wi-Fi from posting or reading names. Phone and laptop must share a network (venue Wi-Fi or the laptop's hotspot).
+
+### C-35 Paste, drag and webcam
+- **Decision:** Ctrl+V on the Competitors tab takes an image from the clipboard (WhatsApp Desktop: right-click → Copy). It goes to the selected competitor; with none selected a small window asks for the number. Dropped files work on any competitor card. Images travel to the main process as bytes (clipboard images have no file path) and are re-encoded like judge photos. **Webcam…** opens a live view, prefers a camera whose name contains "Logitech", remembers the choice, and takes the photo with one click.
+- **Why:** one path for every source; Ctrl+V is the fastest WhatsApp route that is reliable.
+
+### C-36 What the competitor screen shows
+- **Decision:** `competitorScreen` in config: header (competition from DanS or typed number / title / round), `numbers` in the round, `mode` round / spotlight, `spotlight` number. **Load from DanS round** reads the start list and the draw of the competition's current round (2 GET requests, also in On demand mode; never in Manual mode, which uses the offline copy). The numbers stay editable. Cards are sorted by start number, the number drawn as the back-number card on the photo. Solo: first name small, surname large. Couple: both surnames ("Novák – Dvořáková"). Couple photos are framed square, solo photos 3:4. Spotlight: one large card.
+- **Why:** a stored list of numbers is the same whether it came from DanS or was typed, so Manual mode and DanS mode share one path, and the operator can correct a list before pushing.
+
+### C-37 Competitors identified by DanS entry, not by start number (changes C-31)
+- **Decision:** stored entries are keyed `dans:<start-list id>` (DanS competitors) or `m:<random>` (typed in the app, or created by a photo for a number nobody has). A DanS competitor's number comes only from DanS (start list, or DanS's round draw) and cannot be typed; a typed competitor's number is typed and optional. The round, the phone page and "Photo for which number?" still work by number and look the competitor up (a DanS competitor wins over a typed one with the same number; the list marks a shared number). A typed entry that only exists because of a number (phone or pasted photo, no names typed) moves onto the DanS competitor once DanS gives that number. Entries saved by number before this change become typed entries on load and move the same way. **Refresh start list** (1 GET) reads the start list again, because Fetch now reads it only on the first read. Competitors without a number are listed after the numbered ones, by surname; a filter **No number yet** shows them.
+- **Why:** the operator prepares photos and names while competitors are registered but not numbered (D-23). The DanS start-list id stays the same within an event when staff give the number, so nothing prepared is lost.
+- **Changes C-31:** keyed by start number before; the reason given there (the organizer refers to numbers) still holds for lookups, not for storage.
+
+### C-38 Photos follow the dancer to the other day's event, by IDT
+- **Decision:** when a photo is added, the competitor's IDTs are noted on its stored entry (IDTs only, no names). A competitor without a photo of its own shows the photo of an entry in another event with exactly the same IDTs (one for solo, both for a couple), marked "Photo from <event>" in the window and dimmed; it is not copied and cannot be edited there. Adding a photo in the event gives it its own photo, which then wins (e.g. a Standard costume on Sunday).
+- **Why:** Saturday and Sunday are separate DanS events with different ids and different start numbers (D-23); the IDT is the only thing that stays. Showing instead of copying keeps one source of truth and costs nothing if Sunday gets new photos.

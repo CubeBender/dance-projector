@@ -1,6 +1,6 @@
 # Output pages – specification
 
-Served by the control app at `http://<host>:8787`. Pages show the **pushed** state (`/api/state`); `?view=draft` shows the prepared state, which only the app's preview uses (D-13). Every state carries the event's style (`theme`): pages set `--accent` and `--plate` from it, and `?bg=1` paints its background. Built for 1920×1080 OBS browser sources with a transparent background. Pages poll `/api/state?since=<version>` once a second (204 = unchanged) and never need a reload. No long-lived connections: OBS allows only 6 per host across all browser sources (decision C-13).
+Served by the control app at `http://<host>:8787`. Pages show the **pushed** state (`/api/state`); `?view=draft` shows the prepared state, which only the app's preview uses (D-13). Every state carries the event's style (`theme`): pages set `--accent`, `--plate`, `--panel`, `--text`, `--muted` and the number-card colours (`--paper`, `--ink`) from it, and `?bg=1` paints its background. Built for 1920×1080 OBS browser sources with a transparent background. Pages poll `/api/state?since=<version>` once a second (204 = unchanged) and never need a reload. No long-lived connections: OBS allows only 6 per host across all browser sources (decision C-13).
 
 Also: `/out/schedule.html` (running competitions first, then upcoming by check-in time; pages through every 12 s; `rows=`, `page=` options) and `/out/lowerthird.html?slot=A` (bar for the camera scene).
 
@@ -26,7 +26,7 @@ Every label has the primary language and, smaller underneath, the second languag
 
 ## Judges
 - Header like heats.
-- Grid of judge cards: photo with the saved crop (or initials on the accent colour), letter, display name. Up to 15 judges fit without scrolling.
+- Grid of judge cards: photo with the saved crop (or initials), display name; no judge letter (D-20). Order as chosen per side in the app (C-28). Cards are sized from the measured free area between the "Judges" line and the bottom margin: even rows, widest possible cards, taller photos and bigger names when height is left over (C-30). The bottom margin leaves room for the OBS sponsor strip set in the style.
 
 ## Split
 - Two halves in the slot colours. Each half: side label, competition number and title, round, current dance.

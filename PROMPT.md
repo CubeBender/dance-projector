@@ -47,3 +47,27 @@
 > There are few more adjustments:
 > 1) please allow me to delete judges in the Judges gallery (with confirmation window)
 > 2) I also need to be able to show judge selection even without a connection to Dans server. How do I do that? I envisioned there beying a Judge gallery, where I can edit judges and judge selection page, where I can edit the current judge panel/selection.
+
+## 7. Output look for MČR SÓLO (2026-11-19)
+
+> I want to make changes to the output. Is it possible to make the background transparent so I can add background in OBS after? Also, make color scheme based on primary and secondary colors of the MČR event. You can find this info in the projects/OBS_transition folder inside the CLAUDE.md file. Drop the letters on the cards and allow me to select how the judges will be sorted - custom, by surname, .. Lastly, make the header bigger (and also change the colors to respect the theme).
+
+## 8. Judge cards fill the screen (2026-11-19)
+
+> I think we can also make the cards like 20% bigger.
+
+(Claude explained that 9 judges in one row already use the full width.) Clarified:
+
+> The size could be scaled dynamically based on the number of judges and the available space, making sure that a bottom sponsor strip in OBS takes 120px of the height + some small buffer. The Heared could mirror that and judges can fill the middle.
+
+## 9. Competitors in semifinals and finals (2026-11-20)
+
+> There is a new request. The organizer would like to display photos (and names) of dancers in semifinals and finals the same way we display judges. The workflow would look like this: 1) When the competition goes to semifinals, the organizer will take photos of competitors and send them to me using WhatsApp. I have a new tab in the software for competitors. They are eather solo or couples and have a number (usually from 1 up to arround 300) that represents them. If they are solo, they have only one name, surname and IDT and we will be displaying photo, full name and their number. If it is a couple, we will display only surnames, photo and number. The projection would work the same way, but we could maybe project it on a different port so I have port for judges and port for competitors. To add competitors, I can eather fetch from Dans, add manually, or if it is possible. fetch from the ČSTS federation using their IDT. The photo can be added by drag and drop, using a file picker or if it is possible to monitor WhatsApp and add the photo to the competitor using their number or IDT automatically, that would be even better. Or other type of integration so I could pick from WhatsApp gallery. Last option is to take the photo ourselves using my webcam from Logitech.
+
+## 10. Start numbers only from DanS; a two-day championship (2026-11-20)
+
+> I tried the ctrl-v and it works, nice! Webcam photo works as well. The phone photo I could not test now, I will do it later today. I also loaded data from csts so that works well. I started Dans locally. Since all competitors are registered right now, I can prepare the data by fetching all the competitors. They dont have numbers yet, but when I fetched them from dans, it automatically assigned the numbers. That might be problematic since real numbers will be assigned later by competition staff using Dans so if they dont have number yet, they should not have it in the Dance projector eather.
+
+> The event is Mistrovství ČR v latinskoamerických tancích sólo on saturday and Mistrovství ČR ve standardních tancích sólo + vyhlášení MČR 10T sólo on sunday. It is a two day competition that is split into two events.
+
+> Competitors can have different numbers on saturday compared to sunday.

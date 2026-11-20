@@ -11,6 +11,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Parts of the output state the operator can recognise, used to say what is waiting to be pushed.
+// These are the judge projection's; the competitor projection passes its own (COMPETITOR_SECTIONS).
 const SECTIONS = [
   { key: 'slotA', label: 'Competition / panel A', pick: (s) => s.slots?.A },
   { key: 'slotB', label: 'Competition / panel B', pick: (s) => (s.split ? s.slots?.B : null) },
@@ -18,12 +19,20 @@ const SECTIONS = [
   { key: 'style', label: 'Style', pick: (s) => s.theme },
   { key: 'layout', label: 'Floor split / languages', pick: (s) => [s.split, s.language, s.event] },
 ];
+const COMPETITOR_SECTIONS = [
+  { key: 'list', label: 'Competitors', pick: (s) => s.screen?.competitors },
+  { key: 'header', label: 'Competition / round', pick: (s) => s.screen?.header },
+  { key: 'mode', label: 'Whole round / spotlight', pick: (s) => (s.screen ? [s.screen.mode, s.screen.spotlight] : null) },
+  { key: 'style', label: 'Style', pick: (s) => s.theme },
+  { key: 'layout', label: 'Languages', pick: (s) => [s.language, s.event] },
+];
 
 class Projection {
-  // server: OutputServer; file: where the pushed state is kept between runs
-  constructor({ server, file }) {
+  // server: OutputServer; file: where the pushed state is kept between runs; sections: see SECTIONS above
+  constructor({ server, file, sections = SECTIONS }) {
     this.server = server;
     this.file = file;
+    this.sections = sections;
     this.auto = false;
     this.draft = null;
     this.pushed = null;
@@ -60,8 +69,8 @@ class Projection {
   // Labels of the sections where draft and pushed differ, e.g. ['Competition / panel A', 'Style'].
   changes() {
     if (!this.draft) return [];
-    if (!this.pushed) return SECTIONS.filter((s) => s.pick(this.draft) != null).map((s) => s.label);
-    return SECTIONS.filter((s) => JSON.stringify(s.pick(this.draft) ?? null) !== JSON.stringify(s.pick(this.pushed) ?? null))
+    if (!this.pushed) return this.sections.filter((s) => s.pick(this.draft) != null).map((s) => s.label);
+    return this.sections.filter((s) => JSON.stringify(s.pick(this.draft) ?? null) !== JSON.stringify(s.pick(this.pushed) ?? null))
       .map((s) => s.label);
   }
 
@@ -81,4 +90,4 @@ class Projection {
   }
 }
 
-module.exports = { Projection };
+module.exports = { Projection, COMPETITOR_SECTIONS };

@@ -31,10 +31,20 @@
 
 - 2026-11-19 **Own selection and Delete judge** (D-19, C-26): Judge selection tab with From DanS / Own selection per side; own selection works with no DanS data and no event (gallery judges, editable letters, optional number/title/round). Delete judge… with a confirmation window. Judge cards keep double surnames together. Checked in an empty test instance with made-up judges: select, letters, push, rendered page with and without number/title, delete with Cancel and with Delete.
 
+- 2026-11-19 **Output look for MČR** (D-20, C-27 to C-29): Transparent background type (Background page empty, checkerboard in the app's previews), MČR SÓLO 2026 style preset, text colour, colours derived from the style, no letters on judge cards, judge order per side (surname / first name / letter / custom with ↑ ↓), larger themed header. Tests extended (sort modes, Czech alphabet, custom order). Checked: judges and floor pages rendered with the MČR style; in a separate test instance with the sample event: First name order, ↓ switched to Custom and the prepared preview followed, preset applied, transparent preview.
+
+- 2026-11-19 **Judge cards fill the middle** (D-21, C-30): sponsor strip margin in the style (MČR 120 px + 24 px buffer, header 24 px from the top), cards sized from the measured free area, even rows, taller photos and bigger names when a single row leaves height free. Checked with 4, 9 and 14 judges in the MČR style with the strip area marked.
+
+- 2026-11-20 **Competitors on screen** (D-22, C-31 to C-36): Competitors tab, `competitors.json` per event, own output server on port 8788 with its own Push, `/out/competitors.html` (whole round / spotlight), phone upload page (`/upload?key=…`, QR code, off by default), Ctrl+V paste, drag and drop, file picker, webcam (prefers Logitech), ČSTS lookup by IDT (`/api/members/{IDT}`, no login). Tests: `scripts/test-competitors.js` (in `npm test`). Checked in a test instance: screenshots of solo, couples and spotlight; load round from the fixture; push; phone upload to the LAN address (known / unknown number / not an image); photo bytes over IPC; crop; rotate; live ČSTS lookup; the app sees the Logitech StreamCam.
+
+- 2026-11-20 **Competitors without start numbers** (D-23, C-37, C-38): checked the report of "numbers assigned on fetch" – none were; the app was on the old Pardubice event. Competitors are now identified by DanS entry, numbers only from DanS, Refresh start list button, filter No number yet, typed competitors with optional number, phone/pasted photos for an unknown number move onto the DanS competitor once numbered, photos shown across the Saturday/Sunday events by IDT. Tests extended; checked against the local DanS on CS1747: 283 competitors, 0 numbers shown, DanS numbers can't be typed.
+
 ## In progress
 - Nothing running.
 
 ## Next
+- User: try the Competitors tab with real data – Load from DanS round in On demand mode, Ctrl+V from WhatsApp Desktop, the webcam, and the phone upload page from the organizer's phone on the venue Wi-Fi (Windows may ask about the firewall for port 8788: allow private networks).
+- Add the competitor page (`http://<pc>:8788/out/competitors.html`) as a browser source in the OBS collection.
 - In OBS: check that the branding pages (local files) pick up the style from the app; remove the "10 Heats" and "13 Heats B" scenes from the live collection (or rebuild it).
 - User: send a photo or scan of a printed DanS panel list, so webcam reading (D-17) can be built and tested.
 - User: rehearsal read with On demand against the real DanS server, then try Manual mode with the offline copy.

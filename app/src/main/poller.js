@@ -79,6 +79,43 @@ class Poller extends EventEmitter {
     }
   }
 
+  // Competitors of one round (Competitors tab, "Load from DanS round", decision C-36): the event's start list
+  // (names and numbers) and the draw of that round (who dances in it). 2 GET requests. The result is kept in the
+  // raw data like any other read, so it lands in the offline copy too. Returns the draw.
+  async fetchRoundCompetitors(roundId) {
+    if (!this.event) throw new Error('Choose an event first');
+    if (!this.raw) throw new Error('Fetch the event data first');
+    const e = eventIdOf(this.event);
+    try {
+      const [startlist, draw] = await Promise.all([this.dans.startlist(e), this.dans.draw(e, roundId)]);
+      this.raw.startlist = startlist;
+      this.raw.draws = { ...(this.raw.draws || {}), [roundId]: draw };
+      this.status = { connected: true, error: null, lastOk: Date.now() };
+      this.emit('raw', this.raw);
+      return draw;
+    } catch (err) {
+      this.status = { ...this.status, connected: false, error: String(err.message || err) };
+      throw err;
+    } finally { this.emit('status', this.status); }
+  }
+
+  // Start list only (Competitors tab, "Refresh start list"): 1 GET request. Fetch now reads the start list only on
+  // the first read, but start numbers arrive later, when competition staff give them in DanS (D-23).
+  async fetchStartlist() {
+    if (!this.event) throw new Error('Choose an event first');
+    const e = eventIdOf(this.event);
+    try {
+      const startlist = await this.dans.startlist(e);
+      if (!this.raw) this.raw = await fetchRaw(this.dans, this.event); // nothing read yet: everything once
+      else this.raw.startlist = startlist;
+      this.status = { connected: true, error: null, lastOk: Date.now() };
+      this.emit('raw', this.raw);
+    } catch (err) {
+      this.status = { ...this.status, connected: false, error: String(err.message || err) };
+      throw err;
+    } finally { this.emit('status', this.status); }
+  }
+
   start() { this.running = true; this.kick(); }
   stop() { this.running = false; clearTimeout(this.timer); this.timer = null; }
   // Run a poll now. Only one poll is ever in flight; a kick during a poll schedules one more right after.
@@ -132,6 +169,9 @@ class FixturePoller extends EventEmitter {
   setEvent() { this.kick(); }
   seed() {}
   async fetchOnce() { this.kick(); }
+  // the fixture holds draws of a few rounds only; others come back empty
+  async fetchRoundCompetitors(roundId) { return this.raw.draws?.[roundId] || { competitors: [] }; }
+  async fetchStartlist() { this.kick(); }
   start() { this.kick(); this.timer = setInterval(() => this.kick(), 5000); }
   stop() { clearInterval(this.timer); }
   kick() { this.status.lastOk = Date.now(); this.emit('status', this.status); this.emit('raw', this.raw); }

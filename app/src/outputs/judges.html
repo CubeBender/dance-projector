@@ -5,19 +5,24 @@
 <title>Judges</title>
 <link rel="stylesheet" href="common.css">
 <style>
-  .panel-title { margin: 34px 0 22px 6px; color: var(--muted); font-size: 26px; }
-  .judges { flex: 1; display: grid; gap: 26px; align-content: center; justify-content: center; min-height: 0; }
-  .judge { width: var(--w); background: var(--plate); border-radius: 14px; overflow: hidden; position: relative; display: flex; flex-direction: column; }
-  .photo { width: 100%; aspect-ratio: 3 / 4; background: #1b1f2a; position: relative; overflow: hidden; }
+  .panel-title { margin: 22px 0 0 6px; color: var(--accent); font-size: 32px; }
+  /* the grid takes all the height left between the "Judges" line and the bottom edge; fit() sizes the cards */
+  /* Flex rows (not a grid) so a shorter last row is centred, e.g. 5 + 4. fit() sets the side padding so exactly
+     the chosen number of cards fits per row; clientWidth includes padding, so measuring is not affected. */
+  .judges { flex: 1; display: flex; flex-wrap: wrap; gap: var(--gap, 26px); align-content: center; justify-content: center; min-height: 0; margin-top: 18px; box-sizing: border-box; }
+  .judge { width: var(--w); flex: none; background: var(--plate); border-radius: 14px; overflow: hidden; position: relative; display: flex; flex-direction: column; }
+  /* thin accent line between photo and name */
+  .photo { width: 100%; aspect-ratio: 1 / var(--ph, 1.3333); background: var(--panel); position: relative; overflow: hidden; border-bottom: 3px solid var(--accent); }
   .panel-title { display: flex; align-items: baseline; }
   .panel-title .count { margin-left: 0.7em; }
-  .photo.none { display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, color-mix(in srgb, var(--side) 55%, #1b1f2a), #141821); }
-  .initials { font-family: var(--display); font-variation-settings: "wght" 600, "wdth" 80; font-size: calc(var(--w) * 0.34); color: rgba(255,255,255,0.85); letter-spacing: 0.02em; }
-  .judge .card { position: absolute; left: calc(var(--w) * 0.06); top: calc(var(--w) * 0.06); font-size: calc(var(--w) * 0.26); width: 1.15em; height: 1.2em; }
-  .label { padding: calc(var(--w) * 0.06) calc(var(--w) * 0.07) calc(var(--w) * 0.075); }
-  .first { font-size: calc(var(--w) * 0.105); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .last { font-family: var(--display); font-variation-settings: "wght" 600, "wdth" 82; font-size: calc(var(--w) * 0.145); line-height: 1.05; margin-top: 0.1em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-  .country { font-size: calc(var(--w) * 0.075); color: var(--muted); margin-top: 0.3em; }
+  .photo.none { display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, color-mix(in srgb, var(--side) 40%, var(--panel)), var(--panel)); }
+  .initials { font-family: var(--display); font-variation-settings: "wght" 600, "wdth" 80; font-size: calc(var(--w) * 0.34); color: var(--text); opacity: 0.85; letter-spacing: 0.02em; }
+  /* --lw: width the name block is sized from; larger than the card (--t > 1) when there is spare height */
+  .judge { --lw: calc(var(--w) * var(--t, 1)); }
+  .label { padding: calc(var(--lw) * 0.06) calc(var(--w) * 0.07) calc(var(--lw) * 0.075); }
+  .first { font-size: calc(var(--lw) * 0.105); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .last { color: var(--text); font-family: var(--display); font-variation-settings: "wght" 600, "wdth" 82; font-size: calc(var(--lw) * 0.145); line-height: 1.05; margin-top: 0.04em; padding-top: 0.06em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .country { font-size: calc(var(--lw) * 0.075); color: var(--muted); margin-top: 0.3em; }
 </style>
 </head>
 <body>
@@ -35,46 +40,87 @@ function split(name) {
 }
 function initials(j) { return ((j.firstName || '')[0] || '') + ((j.surname || '')[0] || ''); }
 
-// Pick columns and card width so every judge fits in the space under the header.
-function layout(n) {
-  const availW = 1920 - 128, availH = 1080 - 112 - 200 - 80;
+// Card proportions, as multiples of the card width w:
+const PH_MIN = 4 / 3;   // photo height at the normal 3:4 portrait
+const PH_MAX = 1.6;     // the photo may grow up to this tall to use free height (a 5:8 portrait)
+const LABEL = 0.62;     // the name block under the photo (padding, first name, up to two lines of surname)
+const T_MAX = 1.35;    // the name text may grow up to this much to use free height
+const W_MAX = 440;      // a panel of 1–3 judges doesn't need cards bigger than this
+
+// Sizes the cards to fill the grid's real free space (measured, so header size, the sponsor strip margin and the
+// number of judges are all taken into account). Tries every number of rows, with the judges spread evenly over them
+// (14 judges in 2 rows = 7 + 7, not 9 + 5), and keeps the one with the widest cards; the gap shrinks with the cards. When the width is the limit (a long single row), the spare height makes the
+// photos taller instead of leaving an empty strip.
+function fit(grid, n) {
+  const W = grid.clientWidth, H = grid.clientHeight;
+  if (!W || !H || !n) return;
   let best = null;
-  for (let cols = 1; cols <= Math.min(n, 9); cols++) {
-    const rows = Math.ceil(n / cols);
-    const wByW = (availW - (cols - 1) * 26) / cols;
-    const wByH = ((availH - (rows - 1) * 26) / rows) / (4 / 3 + 0.62);
-    const w = Math.floor(Math.min(wByW, wByH, 330));
-    if (!best || w > best.w) best = { cols, w };
+  for (let rows = 1; rows <= n; rows++) {
+    const cols = Math.ceil(n / rows);
+    if (Math.ceil(n / cols) !== rows) continue; // e.g. 9 judges in 4 rows of 3 would leave a row empty
+    // gap about 12 % of the card, 14–26 px; solve w + gap together from the width
+    const wByW = W / (cols + (cols - 1) * 0.12);
+    const gap = Math.round(Math.max(14, Math.min(26, wByW * 0.12))); // whole px, the same value CSS gets
+    const w1 = (W - (cols - 1) * gap) / cols;
+    const w2 = (H - (rows - 1) * gap) / rows / (PH_MIN + LABEL);
+    const w = Math.floor(Math.min(w1, w2, W_MAX));
+    if (!best || w > best.w) best = { cols, rows, w, gap };
   }
-  return best;
+  // Spare height per row (in card widths) is shared: 60 % makes the photo taller (up to PH_MAX), 40 % makes the
+  // name text bigger (up to T_MAX times). Whatever is left after both limits stays as space around the grid.
+  const rowH = (H - (best.rows - 1) * best.gap) / best.rows;
+  const spare = Math.max(0, rowH / best.w - PH_MIN - LABEL);
+  const ph = Math.min(PH_MAX, PH_MIN + spare * 0.6);
+  const t = Math.min(T_MAX, 1 + (spare - (ph - PH_MIN)) / LABEL);
+  grid.style.setProperty('--t', t.toFixed(3));
+  // A surname is one word and can't wrap, so bigger text could cut a long one ("Sedláková"). Step the text size
+  // back down until every name fits its card (or it is back at the normal size).
+  for (let tt = t; tt > 1; tt -= 0.05) {
+    const cut = [...grid.querySelectorAll('.last, .first')].some((e) => e.scrollWidth > e.clientWidth + 1);
+    if (!cut) break;
+    grid.style.setProperty('--t', Math.max(1, tt - 0.05).toFixed(3));
+  }
+  // side padding leaves room for exactly `cols` cards per row (+2 px against rounding)
+  const rowW = best.cols * best.w + (best.cols - 1) * best.gap;
+  grid.style.paddingInline = Math.max(0, Math.floor((W - rowW) / 2) - 1) + 'px';
+  grid.style.setProperty('--w', best.w + 'px');
+  grid.style.setProperty('--gap', Math.round(best.gap) + 'px');
+  grid.style.setProperty('--ph', ph.toFixed(3));
 }
 
 function render(state) {
   const slot = state.slots?.[slotKey];
   applySide(document.body, slot);
+  document.body.classList.toggle('whole', !state.split);
   const comp = slot?.competition;
   const judges = comp?.judges || [];
   const key = JSON.stringify([slot?.label, slot?.labelEn, slot?.color, comp?.number, comp?.title, comp?.round?.name, judges]);
   keyed(stage, key, () => {
     if (!comp || !judges.length) return debug ? [h('div', { class: 'empty-hint' }, comp ? 'No judges assigned yet' : `Slot ${slotKey} has no competition`)] : [];
-    const lay = layout(judges.length);
     return [
       ...header(slot, comp, { showDances: false }),
       h('div', { class: 'panel-title caps enter', '--i': 1 }, bi(L.t('judges'), 'inline'), h('span', { class: 'count' }, `· ${judges.length}`)),
-      h('div', { class: 'judges', style: { gridTemplateColumns: `repeat(${lay.cols}, var(--w))` }, '--w': lay.w + 'px' },
+      h('div', { class: 'judges' },
+        // judges arrive already in the order chosen in the app (Judge selection, "Order on screen");
+        // the judge letter is not shown, the cards carry only the photo and the name
         judges.map((j, i) => {
           const [first, last] = j.lines || split(j.name); // own name fields, or split the typed name on screen
           return h('article', { class: 'judge enter', '--i': i + 2 },
             j.photo ? h('div', { class: 'photo' }, photo(j.photo, j.crop))
                     : h('div', { class: 'photo none' }, h('span', { class: 'initials' }, initials(j))),
-            h('div', { class: 'card' }, j.letter),
             h('div', { class: 'label' }, first ? h('div', { class: 'first' }, first) : null, h('div', { class: 'last' }, last),
               j.country ? h('div', { class: 'country caps' }, j.country) : null));
         })),
     ];
   });
 }
-live(render);
+// After every render, and whenever the page's free space changes (style with a different strip margin, fonts
+// loading and changing the header height), size the cards again. fit() only touches the grid's own variables.
+function refit() { const g = stage.querySelector('.judges'); if (g) fit(g, g.children.length); }
+new ResizeObserver(refit).observe(stage);
+document.fonts?.ready.then(refit);
+const origRender = render;
+live((state) => { origRender(state); refit(); });
 </script>
 </body>
 </html>

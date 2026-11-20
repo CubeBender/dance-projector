@@ -43,9 +43,12 @@ Electron desktop app for the operator. Top bar, four tabs (Competitions, Judge p
 - All judges of the event as toggle buttons (photo, letter, name). Judges in the DanS panel have a green ring on their letter.
 - Clicking edits the panel; the first edit of a DanS panel starts from the DanS list. **Use DanS panel** forgets the edit; **Clear** empties the panel.
 - Edits are stored in `<userData>/panels.json` per event and competition.
+- **Order on screen** (C-28), per side: **Surname** (default), **First name**, **Letter (DanS order)**, **Custom**. The panel is listed in screen order with ↑ / ↓; an arrow switches to Custom. Stored as `slots.X.judgeSort` and `slots.X.order` (IDTs). Own selections list their rows in screen order with the same arrows.
 
 ## 4c. Style (D-15)
-- One style per event: accent, second colour, background colour, panel colour, panel opacity; background **Moving lights**, **Solid colour** or **Image** (drop or choose; re-encoded to max 1920 px in `<userData>/media/`; darkening 0–90 %). **Reset style to default**.
+- **Sponsor strip in OBS:** px kept clear at the bottom (0 = none); pages leave it + 24 px free and move up to 24 px from the top (C-30).
+- **Event colours:** ready-made styles, one click applies them to the current event (C-27). Now: **MČR SÓLO 2026**.
+- One style per event: accent, second colour, background colour, panel colour, text colour, panel opacity (0 = no plates); background **Moving lights**, **Solid colour**, **Image** or **Transparent** (nothing; the background is added in OBS; previews show a checkerboard) (drop or choose; re-encoded to max 1920 px in `<userData>/media/`; darkening 0–90 %). **Reset style to default**.
 - Older configs' whole-floor colour becomes the current event's accent once.
 
 ## 4d. Projection (D-13)

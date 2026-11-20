@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="common.css">
 <style>
   /* Bar at the bottom of a camera picture; everything else stays transparent. */
-  .bar { position: absolute; left: 64px; right: 64px; bottom: 56px; height: 150px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 30px;
+  .bar { position: absolute; left: 64px; right: 64px; bottom: var(--safe-bottom, 56px); height: 150px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 30px;
     background: var(--plate); border-radius: 16px; padding: 0 30px 0 22px; border-left: 10px solid var(--side); backdrop-filter: blur(8px); }
   .bar .card { font-size: 92px; min-width: 1.35em; height: 1.2em; padding: 0 0.12em; }
   .bar .title { font-family: var(--display); font-variation-settings: "wght" 600, "wdth" 85; font-size: 50px; line-height: 1.05; min-width: 0; }
@@ -30,6 +30,7 @@ const root = document.getElementById('root');
 live((state) => {
   const slot = state.slots?.[slotKey];
   applySide(document.body, slot);
+  document.body.classList.toggle('whole', !state.split);
   const comp = slot?.competition, r = comp?.round, d = r?.dances?.[r.currentDance];
   keyed(root, JSON.stringify([slot?.color, comp?.number, comp?.title, r?.name, r?.currentDance]), () => {
     if (!comp) return debug ? [h('div', { class: 'empty-hint' }, `Slot ${slotKey} has no competition`)] : [];

@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Competitors</title>
+<link rel="stylesheet" href="common.css">
+<!-- Competitor projection (decision D-22, C-36). Served by the competitor output server (port 8788 by default),
+     which has its own pushed state: /api/state there is { theme, language, event, screen }, where
+       screen.header       { number, title, titleEn, round } or null
+       screen.mode         'round' (every competitor of the round) | 'spotlight' (one competitor large)
+       screen.competitors  [{ number, kind: 'solo'|'couple', first, last, surnames, photo, crop }] sorted by number
+       screen.spotlight    one of those, or null -->
+<style>
+  .panel-title { margin: 22px 0 0 6px; color: var(--accent); font-size: 32px; display: flex; align-items: baseline; }
+  .panel-title .count { margin-left: 0.7em; }
+
+  /* ---- whole round: flex rows sized by fit(), like the judge page ---- */
+  .grid { flex: 1; display: flex; flex-wrap: wrap; gap: var(--gap, 26px); align-content: center; justify-content: center; min-height: 0; margin-top: 18px; box-sizing: border-box; }
+  .comp { width: var(--w); flex: none; background: var(--plate); border-radius: 14px; overflow: hidden; position: relative; display: flex; flex-direction: column; }
+  .comp { --lw: calc(var(--w) * var(--t, 1)); }
+  /* photo height = width × --ph (3:4 for solo, square for couples; may grow when there is spare height) */
+  .photo { width: 100%; aspect-ratio: 1 / var(--ph, 1.3333); background: var(--panel); position: relative; overflow: hidden; border-bottom: 3px solid var(--accent); }
+  .photo.none { display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 30%, var(--panel)), var(--panel)); }
+  .initials { font-family: var(--display); font-variation-settings: "wght" 600, "wdth" 80; font-size: calc(var(--w) * 0.3); color: var(--text); opacity: 0.6; }
+  /* the start number as a back-number card, sitting on the bottom-left corner of the photo */
+  .comp .card { position: absolute; left: calc(var(--w) * 0.06); bottom: calc(var(--w) * 0.05); font-size: calc(var(--w) * 0.2); min-width: 1.5em; height: 1.18em; padding: 0 0.14em; z-index: 1; }
+  .label { padding: calc(var(--lw) * 0.06) calc(var(--w) * 0.07) calc(var(--lw) * 0.075); }
+  .first { font-size: calc(var(--lw) * 0.105 * var(--fs, 1)); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .last { color: var(--text); font-family: var(--display); font-variation-settings: "wght" 600, "wdth" 82; font-size: calc(var(--lw) * 0.145 * var(--fs, 1)); line-height: 1.08; margin-top: 0.04em; padding-top: 0.06em; overflow: hidden; white-space: nowrap; }
+  /* couples: one surname per line; the second line follows straight on */
+  .last + .last { margin-top: 0; padding-top: 0; }
+
+  /* ---- spotlight: one competitor, photo left, number and name right ---- */
+  .spot { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; gap: 72px; margin-top: 28px; }
+  .spot .photo { height: 100%; width: auto; max-height: 760px; aspect-ratio: 1 / var(--ph); border-radius: 18px; border-bottom-width: 6px; flex: none; }
+  .spot .photo.none .initials { font-size: 220px; }
+  .spot-text { display: flex; flex-direction: column; align-items: flex-start; gap: 34px; max-width: 900px; min-width: 0; }
+  .spot .card { font-size: 220px; min-width: 1.4em; height: 1.15em; padding: 0 0.12em; }
+  .spot .first { font-size: calc(56px * var(--fs, 1)); white-space: normal; }
+  .spot .last { font-size: calc(120px * var(--fs, 1)); }
+  .spot .plate { background: var(--plate); border-radius: 18px; padding: 30px 40px 36px; border-left: 10px solid var(--accent); }
+</style>
+</head>
+<body>
+<div class="stage" id="stage"></div>
+<script src="common.js"></script>
+<script>
+const { h, bi, live, keyed, header, applySide, photo, debug } = DP;
+const stage = document.getElementById('stage');
+const TITLE = (lang) => (lang === 'en' ? 'Competitors' : 'Soutěžící');
+
+// Photo shape: couples stand side by side, so their photos are framed square; solo dancers 3:4 like the judges.
+// One competition is either all solo or all couples, so the whole page uses one shape.
+const photoRatio = (list) => (list.some((c) => c.kind === 'couple') ? 1 : 4 / 3);
+const initials = (c) => (c.surnames || []).map((s) => s[0]).join('') || String(c.number);
+
+// Name lines of one competitor. Solo: small first name, large surname. Couple: only the surnames, one per line
+// (a dash between them would wrap to the start of a line on narrow cards).
+function nameBlock(c) {
+  const lines = c.kind === 'couple' && c.surnames.length > 1 ? c.surnames : [c.last];
+  return [c.first ? h('div', { class: 'first' }, c.first) : null, ...lines.map((s) => h('div', { class: 'last' }, s))];
+}
+
+function photoBox(c) {
+  return c.photo ? h('div', { class: 'photo' }, photo(c.photo, c.crop)) : h('div', { class: 'photo none' }, h('span', { class: 'initials' }, initials(c)));
+}
+
+// ---- card fitting, the same method as the judge page (judges.html fit) ----
+const LABEL = 0.62;   // name block under the photo, in card widths
+const T_MAX = 1.35;   // name text may grow this much with spare height
+const W_MAX = 440;
+function fit(grid, n, phMin) {
+  const W = grid.clientWidth, H = grid.clientHeight;
+  if (!W || !H || !n) return;
+  grid.style.removeProperty('--fs'); // measured at full size
+  grid.querySelectorAll('.last, .first').forEach((e) => e.style.removeProperty('--fs'));
+  const phMax = phMin * 1.2;
+  let best = null;
+  for (let rows = 1; rows <= n; rows++) {
+    const cols = Math.ceil(n / rows);
+    if (Math.ceil(n / cols) !== rows) continue;
+    const wByW = W / (cols + (cols - 1) * 0.12);
+    const gap = Math.round(Math.max(14, Math.min(26, wByW * 0.12)));
+    const w1 = (W - (cols - 1) * gap) / cols;
+    const w2 = (H - (rows - 1) * gap) / rows / (phMin + LABEL);
+    const w = Math.floor(Math.min(w1, w2, W_MAX));
+    if (!best || w > best.w) best = { cols, rows, w, gap };
+  }
+  // spare height: 60 % taller photo (up to +20 %), 40 % bigger names
+  const rowH = (H - (best.rows - 1) * best.gap) / best.rows;
+  const spare = Math.max(0, rowH / best.w - phMin - LABEL);
+  const ph = Math.min(phMax, phMin + spare * 0.6);
+  const t = Math.min(T_MAX, 1 + (spare - (ph - phMin)) / LABEL);
+  grid.style.setProperty('--t', t.toFixed(3));
+  // step the text back down while a name is cut
+  for (let tt = t; tt > 1; tt -= 0.05) {
+    if (![...grid.querySelectorAll('.last, .first')].some((e) => e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 2)) break;
+    grid.style.setProperty('--t', Math.max(1, tt - 0.05).toFixed(3));
+  }
+  const rowW = best.cols * best.w + (best.cols - 1) * best.gap;
+  grid.style.paddingInline = Math.max(0, Math.floor((W - rowW) / 2) - 1) + 'px';
+  grid.style.setProperty('--w', best.w + 'px');
+  grid.style.setProperty('--gap', best.gap + 'px');
+  grid.style.setProperty('--ph', ph.toFixed(3));
+  shrinkToFit(grid);
+}
+
+// Name lines don't wrap, so a long surname ("Zelenka-Pokorný") would be cut on a narrow card. All cards share one
+// text size, so the row looks even: the size the longest name needs, but not below 60 %. A name that still doesn't
+// fit at that size (a rare outlier) gets smaller on its own, so it doesn't drag every other card down with it.
+function shrinkToFit(root) {
+  const lines = [...root.querySelectorAll('.last, .first')];
+  root.style.removeProperty('--fs');
+  lines.forEach((e) => e.style.removeProperty('--fs'));
+  const need = (e) => Math.min(1, (e.clientWidth - 1) / e.scrollWidth); // share of the size that fits
+  const common = Math.max(0.6, Math.min(1, ...lines.map(need)));
+  if (common < 1) root.style.setProperty('--fs', common.toFixed(3));
+  for (const e of lines) {
+    const n = need(e);
+    if (n < 1) e.style.setProperty('--fs', Math.max(0.4, common * n * 0.98).toFixed(3));
+  }
+}
+
+// header() from common.js expects a slot and a competition; the competitor screen has one header, no floor sides
+function headerOf(hd) {
+  if (!hd) return [];
+  const comp = { number: hd.number, title: hd.title, titleEn: hd.titleEn, round: hd.round ? { name: hd.round, competes: null, dances: [] } : null };
+  return header({ label: '', labelEn: '' }, comp, { showDances: false });
+}
+
+function render(state) {
+  const scr = state.screen || {};
+  applySide(document.body, { color: state.theme?.accent });
+  document.body.classList.add('whole'); // one screen, coloured in the event's accent
+  const list = scr.competitors || [];
+  keyed(stage, JSON.stringify(scr), () => {
+    if (scr.mode === 'spotlight') {
+      const c = scr.spotlight;
+      if (!c) return debug ? [h('div', { class: 'empty-hint' }, 'Spotlight: pick a competitor in the app')] : [];
+      const box = photoBox(c);
+      box.style.setProperty('--ph', photoRatio([c]));
+      return [...headerOf(scr.header),
+        h('div', { class: 'spot enter', '--i': 1 }, box,
+          h('div', { class: 'spot-text' }, h('div', { class: 'card' }, c.number), h('div', { class: 'plate' }, nameBlock(c))))];
+    }
+    if (!list.length) return debug ? [h('div', { class: 'empty-hint' }, 'No competitors in the round yet')] : [];
+    return [...headerOf(scr.header),
+      h('div', { class: 'panel-title caps enter', '--i': 1 }, bi(TITLE, 'inline'), h('span', { class: 'count' }, `· ${list.length}`)),
+      h('div', { class: 'grid', 'data-ph': photoRatio(list) },
+        list.map((c, i) => {
+          const box = photoBox(c);
+          box.append(h('div', { class: 'card' }, c.number));
+          return h('article', { class: 'comp enter', '--i': i + 2 }, box, h('div', { class: 'label' }, nameBlock(c)));
+        }))];
+  });
+}
+function refit() {
+  const g = stage.querySelector('.grid');
+  if (g) fit(g, g.children.length, Number(g.dataset.ph));
+  const sp = stage.querySelector('.spot'); if (sp) shrinkToFit(sp);
+}
+new ResizeObserver(refit).observe(stage);
+document.fonts?.ready.then(refit);
+live((state) => { render(state); refit(); });
+</script>
+</body>
+</html>

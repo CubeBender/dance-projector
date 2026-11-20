@@ -71,14 +71,45 @@
     const n = parseInt(String(hex || '#090B12').slice(1), 16);
     return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${(pct ?? 80) / 100})`;
   }
+  // "#BD9C66" -> [189, 156, 102]
+  const rgb = (hex) => { const n = parseInt(String(hex).slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+  const toHex = (c) => '#' + c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+  // a + (b - a) * share: mix(text, panel, 0.4) = text with 40 % of the panel colour
+  const mix = (a, b, share) => { const x = rgb(a), y = rgb(b); return toHex(x.map((v, i) => v + (y[i] - v) * share)); };
+  // relative luminance 0 (black) … 1 (white), as in WCAG
+  const lum = (hex) => { const [r, g, b] = rgb(hex).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  // Text colour that reads on a coloured background: the style's dark colour on light fills (gold), white on dark ones.
+  let darkInk = '#0B0D12';
+  const inkOn = (hex) => (lum(hex) > 0.3 ? darkInk : '#FFFFFF');
+
   // Turns the style into CSS variables used by common.css and the pages:
-  //   --accent  main accent    --plate  colour of the plates behind text
+  //   --accent       main accent                     --plate        plates behind text (with opacity)
+  //   --panel        the plate colour, solid         --text/--muted names and titles / quieter text
+  //   --paper/--ink  number card fill and its digits (accent colour with readable ink)
   // With ?bg=1 it also paints the background (colour or image) so a page can be checked outside OBS.
+  // The background type 'none' (transparent) changes nothing here: these pages are always transparent.
   function applyTheme(t) {
     if (!t) return;
     const root = document.documentElement.style;
+    const text = t.text || '#F3F5F9', panel = t.panel || '#090B12';
+    // the darker of panel / ground is the ink for light fills, so gold gets the event's near-black, not pure black
+    darkInk = lum(panel) < lum(t.ground || panel) ? panel : (t.ground || panel);
+    if (lum(darkInk) > 0.2) darkInk = '#0B0D12';
     root.setProperty('--accent', t.accent);
-    root.setProperty('--plate', rgba(t.panel, t.panelOpacity));
+    root.setProperty('--plate', rgba(panel, t.panelOpacity));
+    root.setProperty('--panel', panel);
+    root.setProperty('--text', text);
+    root.setProperty('--muted', mix(text, panel, 0.4));
+    root.setProperty('--plate-line', mix(text, panel, 0.8));
+    root.setProperty('--paper', t.accent);
+    root.setProperty('--paper-edge', mix(t.accent, '#000000', 0.35));
+    root.setProperty('--ink', inkOn(t.accent));
+    // Free space at the top and bottom edges. With a sponsor strip in OBS the bottom keeps strip + BUFFER clear and
+    // the top mirrors the buffer, so the header sits as close to the top edge as the content sits to the strip.
+    // Without a strip both are the usual 56 px.
+    const BUFFER = 24;
+    root.setProperty('--safe-top', (t.strip ? BUFFER : 56) + 'px');
+    root.setProperty('--safe-bottom', (t.strip ? t.strip + BUFFER : 56) + 'px');
     if (debug) {
       const dim = `linear-gradient(rgba(0,0,0,${(t.imageDim ?? 40) / 100}), rgba(0,0,0,${(t.imageDim ?? 40) / 100}))`;
       document.body.style.background = t.imageUrl
@@ -137,7 +168,12 @@
     return [plate, track];
   }
 
-  function applySide(el, slot) { el.style.setProperty('--side', slot?.color || '#1E7BFF'); }
+  // --side = floor lighting colour of the slot (the accent on a whole floor); --on-side = text that reads on it
+  function applySide(el, slot) {
+    const c = slot?.color || '#1E7BFF';
+    el.style.setProperty('--side', c);
+    el.style.setProperty('--on-side', inkOn(c));
+  }
 
   // Judge photo with the saved crop: focus point x/y in percent and zoom.
   function photo(url, crop) {

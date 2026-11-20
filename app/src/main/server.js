@@ -9,7 +9,14 @@
 //                   draft (?view=draft) – what the operator is preparing; only the app's preview asks for it
 //
 // Read-only: GET only, files only from the folders above.
+//
+// One exception, only on the competitor server and only while the operator has switched it on (decision C-34):
+//   /upload           the phone page (takes a photo and sends it with a start number)
+//   /upload/list      start numbers with names, so the phone can show who a number is
+//   /upload/photo     POST: one image, becomes the main photo of that start number
+// Every /upload request must carry the secret key from the app's QR code (?key=…); without it: 403.
 const http = require('http');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
@@ -27,7 +34,10 @@ function safeJoin(root, rel) {
 }
 
 class OutputServer {
-  constructor({ outputsDir, photoDir, mediaDir = null, brandDir = null }) {
+  // upload: only for the competitor server – { enabled(): bool, key(): string, page: file of the phone page,
+  //   list(): [{ number, label }], receive(number, Buffer): Promise<{ number, label }> }
+  constructor({ outputsDir, photoDir, mediaDir = null, brandDir = null, upload = null }) {
+    this.upload = upload;
     this.outputsDir = outputsDir;
     this.photoDir = photoDir;
     this.mediaDir = mediaDir;
@@ -76,6 +86,7 @@ class OutputServer {
   handle(req, res) {
     const url = new URL(req.url, 'http://x');
     const p = url.pathname;
+    if (p === '/upload' || p.startsWith('/upload/')) { this.handleUpload(req, res, url); return; }
     if (req.method !== 'GET') { res.writeHead(405).end(); return; }
     // The branding pages in OBS are local files (file://), so their requests to us are cross-origin.
     // Everything here is read-only display data, so any origin may read it.
@@ -97,6 +108,36 @@ class OutputServer {
     if (p.startsWith('/brand/')) return this.serveFile(res, safeJoin(this.brandDir, p.slice(7)));
     if (p === '/out' || p === '/out/') return this.serveFile(res, path.join(this.outputsDir, 'index.html'));
     if (p.startsWith('/out/')) return this.serveFile(res, safeJoin(this.outputsDir, p.slice(5)));
+    res.writeHead(404).end('not found');
+  }
+
+  // ---- phone upload (C-34) ----
+  handleUpload(req, res, url) {
+    const up = this.upload;
+    const json = (code, body) => res.writeHead(code, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(body));
+    // Off, or wrong key: the same plain 403, so a guesser learns nothing about whether it is switched on.
+    // timingSafeEqual: comparing the key takes the same time whatever the guess.
+    const given = Buffer.from(String(url.searchParams.get('key') || ''));
+    const want = Buffer.from(String(up?.key() || ''));
+    const ok = up?.enabled() && want.length > 0 && given.length === want.length && crypto.timingSafeEqual(given, want);
+    if (!ok) { res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' }).end('This upload link is not active. Ask the operator for the current QR code.'); return; }
+    const p = url.pathname;
+    if (req.method === 'GET' && p === '/upload') return this.serveFile(res, up.page, { 'cache-control': 'no-store' });
+    if (req.method === 'GET' && p === '/upload/list') return json(200, { competitors: up.list() });
+    if (req.method === 'POST' && p === '/upload/photo') {
+      const number = url.searchParams.get('number');
+      if (!/^image\/(jpeg|png|webp)$/i.test(String(req.headers['content-type'] || '').split(';')[0].trim())) { json(415, { error: 'Send a JPEG, PNG or WebP image' }); req.resume(); return; }
+      const limit = 20 * 1024 * 1024; // 20 MB: any phone photo fits, the phone page also shrinks it first
+      if (Number(req.headers['content-length']) > limit) { json(413, { error: 'The photo is larger than 20 MB' }); req.resume(); return; }
+      const chunks = []; let size = 0; let tooBig = false;
+      req.on('data', (c) => { size += c.length; if (size > limit) { tooBig = true; req.destroy(); } else chunks.push(c); });
+      req.on('end', async () => {
+        if (tooBig) return;
+        try { json(200, await up.receive(number, Buffer.concat(chunks))); }
+        catch (e) { json(400, { error: String(e.message || e) }); }
+      });
+      return;
+    }
     res.writeHead(404).end('not found');
   }
 }

@@ -25,6 +25,9 @@ contextBridge.exposeInMainWorld('dp', {
   panelToggle: (compId, personId) => ipcRenderer.invoke('panel-toggle', compId, personId),
   panelReset: (compId) => ipcRenderer.invoke('panel-reset', compId),
   panelClear: (compId) => ipcRenderer.invoke('panel-clear', compId),
+  // order of the judge cards on screen: mode 'surname' | 'firstname' | 'letter' | 'custom'; delta -1 / +1
+  setJudgeSort: (slot, mode) => ipcRenderer.invoke('set-judge-sort', slot, mode),
+  judgeMove: (slot, fedId, delta) => ipcRenderer.invoke('judge-move', slot, fedId, delta),
   // own selections without DanS (slot 'A' | 'B')
   setSlotSource: (slot, source) => ipcRenderer.invoke('set-slot-source', slot, source), // 'dans' | 'manual'
   manualUpdate: (slot, patch) => ipcRenderer.invoke('manual-update', slot, patch),      // number, title, titleEn, round
@@ -33,6 +36,7 @@ contextBridge.exposeInMainWorld('dp', {
   manualClear: (slot) => ipcRenderer.invoke('manual-clear', slot),
   // style of the current event
   setTheme: (patch) => ipcRenderer.invoke('set-theme', patch),
+  themePreset: (id) => ipcRenderer.invoke('theme-preset', id),
   themeReset: () => ipcRenderer.invoke('theme-reset'),
   themeImage: (file) => ipcRenderer.invoke('theme-image', file ? webUtils.getPathForFile(file) : null),
   themeImageRemove: () => ipcRenderer.invoke('theme-image-remove'),
@@ -47,7 +51,41 @@ contextBridge.exposeInMainWorld('dp', {
   judgePhotoRotate: (fedId, file, degrees) => ipcRenderer.invoke('judge-photo-rotate', fedId, file, degrees), // -> { state, file }
   galleryImport: (dir) => ipcRenderer.invoke('gallery-import', dir), // no dir = folder dialog
   openUrl: (url) => ipcRenderer.invoke('open-url', url),
+  // ---- competitors (D-22) ----
+  // what the competitor screen shows: { competitionId, number, title, titleEn, round, numbers (text), mode, spotlight }
+  compScreen: (patch) => ipcRenderer.invoke('comp-screen', patch),
+  compInRound: (number, on) => ipcRenderer.invoke('comp-in-round', number, on),
+  compLoadRound: (compId) => ipcRenderer.invoke('comp-load-round', compId),
+  compRefreshStartlist: () => ipcRenderer.invoke('comp-refresh-startlist'), // start numbers given since the last read
+  pushCompetitors: () => ipcRenderer.invoke('push-competitors'),
+  // the list. A competitor is addressed by its key ('dans:<id>' or 'm:<id>', see competitors.js), not its number,
+  // because many have no start number yet. New: { number (optional), kind, people: [{ name, surname, idt }] }
+  compCreate: (c) => ipcRenderer.invoke('comp-create', c),
+  compUpdate: (key, patch) => ipcRenderer.invoke('comp-update', key, patch),
+  compDelete: (key) => ipcRenderer.invoke('comp-delete', key),
+  // photos. files = File objects from a drop; a file without a path on disk (dragged out of another app) is sent
+  // as bytes instead. none = open a file dialog.
+  compPhotosAdd: async (key, files, makeMain) => {
+    if (!files) return ipcRenderer.invoke('comp-photos-add', key, null, makeMain);
+    const list = [...files];
+    const paths = list.map((f) => webUtils.getPathForFile(f));
+    if (paths.every(Boolean)) return ipcRenderer.invoke('comp-photos-add', key, paths, makeMain);
+    let st = null;
+    for (const [i, f] of list.entries()) st = await ipcRenderer.invoke('comp-photo-bytes', { key }, new Uint8Array(await f.arrayBuffer()), makeMain && i === 0);
+    return st;
+  },
+  // bytes = Uint8Array (pasted image, webcam shot); target = { key } or { number } -> state with .key of the competitor
+  compPhotoBytes: (target, bytes, makeMain = true) => ipcRenderer.invoke('comp-photo-bytes', target, bytes, makeMain),
+  compPhotoMain: (key, file) => ipcRenderer.invoke('comp-photo-main', key, file),
+  compPhotoDelete: (key, file) => ipcRenderer.invoke('comp-photo-delete', key, file),
+  compCrop: (key, crop, file) => ipcRenderer.invoke('comp-crop', key, crop, file),
+  compPhotoRotate: (key, file, degrees) => ipcRenderer.invoke('comp-photo-rotate', key, file, degrees), // -> { state, file }
+  setWebcam: (id) => ipcRenderer.invoke('set-webcam', id),
+  cstsLookup: (idt) => ipcRenderer.invoke('csts-lookup', idt), // -> { found } | { error }
+  phoneUpload: (patch) => ipcRenderer.invoke('phone-upload', patch), // { enabled } | { newKey: true }
+  qr: (url) => ipcRenderer.invoke('qr', url),                       // -> data: URL of the QR code picture
   // pushed from the main process
   onState: (fn) => ipcRenderer.on('state', (_e, s) => fn(s)),
   onStatus: (fn) => ipcRenderer.on('status', (_e, s) => fn(s)),
+  onNotice: (fn) => ipcRenderer.on('notice', (_e, n) => fn(n)), // e.g. a photo arrived from the phone
 });

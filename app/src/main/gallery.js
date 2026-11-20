@@ -55,4 +55,23 @@ function sortForImport(files) {
     .sort((a, b) => (a.info?.idt || '').localeCompare(b.info?.idt || '') || (a.info?.n || 0) - (b.info?.n || 0));
 }
 
-module.exports = { parseFileName, migrateEntry, mainPhoto, sortForImport };
+// ---- photo list of any entry (used for competitors; judges keep their own store methods) ----
+// Each takes an entry with { photos, main } and returns a NEW entry; nothing is changed in place.
+
+// Adds a photo. The first photo, or any with makeMain, becomes the main one.
+function withPhoto(e, photo, makeMain = false) {
+  const photos = [...(e.photos || []), photo];
+  return { ...e, photos, main: makeMain || !e.main ? photo.file : e.main };
+}
+// Removes a photo; if it was the main one, the next becomes main.
+function withoutPhoto(e, file) {
+  const photos = (e.photos || []).filter((p) => p.file !== file);
+  return { ...e, photos, main: e.main === file ? (photos[0]?.file || null) : e.main };
+}
+// Changes one photo's fields (crop, file name after turning, …). A new file name also moves "main" along.
+function withPhotoChange(e, file, patch) {
+  const photos = (e.photos || []).map((p) => (p.file === file ? { ...p, ...patch } : p));
+  return { ...e, photos, main: e.main === file && patch.file ? patch.file : e.main };
+}
+
+module.exports = { parseFileName, migrateEntry, mainPhoto, sortForImport, withPhoto, withoutPhoto, withPhotoChange };

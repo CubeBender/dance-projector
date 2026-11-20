@@ -7,6 +7,7 @@
 | 3 | Control app | [Docs/control-app](Docs/control-app/PLAN.md) | 2 |
 | 4 | Output pages | [Docs/output-pages](Docs/output-pages/PLAN.md) | 2 |
 | 5 | OBS show | [Docs/obs-show](Docs/obs-show/PLAN.md) | 4, assets from the user |
+| 6 | Competitors on screen (D-22) | [Docs/competitors](Docs/competitors/PLAN.md) | 3, 4 |
 
 ## Order of work
 
@@ -28,3 +29,14 @@
 | 5 | Heats removed from outputs and OBS build script | done |
 | 6 | Check in OBS: branding pages (local files) read the style from the app | waiting for OBS to run |
 | 7 | Webcam reading of the printed panel | waiting for a sample printout |
+
+## Competitors (2026-11-20, D-22)
+
+| # | Step | State |
+|---|---|---|
+| 1 | Data, store, ČSTS client, DanS round read | done |
+| 2 | Second output server (8788) and projection, `competitors.html` | done |
+| 3 | Phone upload page with key and QR code | done |
+| 4 | Competitors tab: screen block, list, paste, webcam, New competitor | done |
+| 5 | Check with a real phone on the venue network, a real WhatsApp copy, the Logitech camera | user |
+| 6 | Add the competitor page to the OBS collection | after the user's check |

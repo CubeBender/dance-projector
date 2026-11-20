@@ -4,6 +4,9 @@
   --text: #F3F5F9; --muted: #9AA3B5; --plate: rgba(9, 11, 18, 0.72);
   --display: "Bahnschrift", "DIN Alternate", "Arial Narrow", sans-serif;
   --body: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  /* same as the output pages; otherwise Chromium paints an opaque white backdrop behind this page when it is
+     framed in the dark control window, and a transparent background would preview as white */
+  color-scheme: dark;
 }
 html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: transparent; color: var(--text); font-family: var(--body); }
 .caps { font-family: var(--display); font-variation-settings: "wght" 400, "wdth" 85; text-transform: uppercase; letter-spacing: 0.16em; }

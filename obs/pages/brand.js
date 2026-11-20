@@ -11,7 +11,9 @@
   // ---- style from the app ----
   // Asks the app for the pushed state every 2 s and applies its style (theme.js in the app):
   //   --primary / --secondary / --ground   colours used by these pages
-  //   data-bg on <html>                    'lights' | 'solid' | 'image' (background.html shows the matching layers)
+  //   data-bg on <html>                    'lights' | 'solid' | 'image' | 'none' (background.html shows the matching
+  //                                        layers; 'none' = transparent, the background is added in OBS)
+  //   --text / --muted                     text colours
   //   --bg-image / --bg-dim                background image and how much it is darkened
   // Pages opened from the app itself (/brand/…) ask their own server; local files in OBS ask SHOW.app.
   // ?view=draft shows the style being prepared (the app's preview uses it).
@@ -24,7 +26,11 @@
     root.setProperty('--primary', t.accent);
     root.setProperty('--secondary', t.secondary);
     root.setProperty('--ground', t.ground);
-    document.documentElement.dataset.bg = t.imageUrl ? 'image' : (t.background === 'solid' ? 'solid' : 'lights');
+    if (t.text) {
+      root.setProperty('--text', t.text);
+      root.setProperty('--muted', `color-mix(in srgb, ${t.text} 60%, ${t.panel || t.ground})`);
+    }
+    document.documentElement.dataset.bg = t.imageUrl ? 'image' : (['solid', 'none'].includes(t.background) ? t.background : 'lights');
     root.setProperty('--bg-image', t.imageUrl ? `url("${base}${t.imageUrl}")` : 'none');
     root.setProperty('--bg-dim', String((t.imageDim ?? 40) / 100));
   }

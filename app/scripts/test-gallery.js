@@ -87,8 +87,21 @@ s.updateConfig({ slots: { A: { source: 'manual' } }, manualPanels: { A: { number
 let out = outputState(null, {}, s, { connected: false });
 const comp = out.slots.A.competition;
 assert.ok(comp.manual); assert.strictEqual(comp.number, '7'); assert.strictEqual(comp.title, 'Finále Senioři'); assert.strictEqual(comp.round, null);
-assert.deepStrictEqual(comp.judges.map((j) => `${j.letter} ${j.name}`), ['A Ing. Jana Nováková', 'B Petr Dvořák'], 'sorted by letter; unknown IDT dropped');
-assert.ok(comp.judges[0].photo, 'gallery main photo');
+assert.deepStrictEqual(comp.judges.map((j) => `${j.letter} ${j.name}`), ['B Petr Dvořák', 'A Ing. Jana Nováková'], 'sorted by surname (default); unknown IDT dropped');
+// order on screen per side (panels.js sortJudges)
+const shownOrder = (mode, ids) => { s.updateConfig({ slots: { A: { judgeSort: mode, order: ids || [] } } }); return outputState(null, {}, s, {}).slots.A.competition.judges.map((j) => j.letter); };
+assert.deepStrictEqual(shownOrder('letter'), ['A', 'B']);
+assert.deepStrictEqual(shownOrder('firstname'), ['A', 'B'], 'Ing. Jana before Petr');
+assert.deepStrictEqual(shownOrder('custom', ['10000001', '10000002']), ['A', 'B']);
+assert.deepStrictEqual(shownOrder('custom', ['10000002']), ['B', 'A'], 'judges missing from the custom list go last');
+assert.deepStrictEqual(shownOrder('nonsense'), ['B', 'A'], 'unknown mode falls back to surname');
+s.updateConfig({ slots: { A: { judgeSort: 'surname', order: [] } } });
+const { sortJudges, moveInOrder } = require('../src/main/panels');
+const czech = sortJudges([{ surname: 'Čermák' }, { surname: 'Chalupa' }, { surname: 'Hora' }, { surname: 'Cibulka' }, { surname: 'Říha' }, { surname: 'Rada' }], 'surname');
+assert.deepStrictEqual(czech.map((j) => j.surname), ['Cibulka', 'Čermák', 'Hora', 'Chalupa', 'Rada', 'Říha'], 'Czech alphabet: Č after C, CH after H');
+assert.deepStrictEqual(moveInOrder(['a', 'b', 'c'], 'c', -1), ['a', 'c', 'b']);
+assert.deepStrictEqual(moveInOrder(['a', 'b', 'c'], 'a', -1), ['a', 'b', 'c'], 'first cannot move up');
+assert.ok(comp.judges.find((j) => j.letter === 'A').photo, 'gallery main photo');
 // a DanS side without data is simply empty
 s.updateConfig({ slots: { A: { source: 'dans' } } });
 assert.strictEqual(outputState(null, {}, s, {}).slots.A.competition, null);
