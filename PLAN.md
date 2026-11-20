@@ -8,6 +8,7 @@
 | 4 | Output pages | [Docs/output-pages](Docs/output-pages/PLAN.md) | 2 |
 | 5 | OBS show | [Docs/obs-show](Docs/obs-show/PLAN.md) | 4, assets from the user |
 | 6 | Competitors on screen (D-22) | [Docs/competitors](Docs/competitors/PLAN.md) | 3, 4 |
+| 7 | Reading DanS printouts (D-17, D-24) | [Docs/printout](Docs/printout/PLAN.md) | 6 |
 
 ## Order of work
 

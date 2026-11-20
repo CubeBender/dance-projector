@@ -39,10 +39,15 @@
 
 - 2026-11-20 **Competitors without start numbers** (D-23, C-37, C-38): checked the report of "numbers assigned on fetch" – none were; the app was on the old Pardubice event. Competitors are now identified by DanS entry, numbers only from DanS, Refresh start list button, filter No number yet, typed competitors with optional number, phone/pasted photos for an unknown number move onto the DanS competitor once numbered, photos shown across the Saturday/Sunday events by IDT. Tests extended; checked against the local DanS on CS1747: 283 competitors, 0 numbers shown, DanS numbers can't be typed.
 
+- 2026-11-20 Committed all work so far (`4416078`).
+- 2026-11-20 **Reading DanS printouts** (D-24, C-39 to C-41): found DanS's report list in `sart.exe` and an earlier round start list PDF; offline Tesseract (Czech) with image preparation; name-based parser (`printout.js`) with tests (`scripts/test-printout.js`, in `npm test`); **Read printout…** window (webcam, Ctrl+V, file) with review and Apply to the competitor screen and the own judge selection; phone page Printout mode; number from printout. Checked in a Manual-mode test instance with the real Pardubice offline copy and simulated webcam frames of the real sheet: header, 3/3 competitors, 7/7 judges (2 letters to check on the whole-A4 frame); outputs drawn from it.
+
 ## In progress
 - Nothing running.
 
 ## Next
+- User: print a round start list in the local DanS (Pardubice event has rounds), read it on paper with the Logitech under the real light; ask the organizers which sheets you will receive and whether you can get one per round.
+- User, before the MČR: fetch both events (Saturday CS1747, Sunday) in On demand mode so the offline copies hold the start lists and judge lists; fill the judge gallery for both.
 - User: try the Competitors tab with real data – Load from DanS round in On demand mode, Ctrl+V from WhatsApp Desktop, the webcam, and the phone upload page from the organizer's phone on the venue Wi-Fi (Windows may ask about the firewall for port 8788: allow private networks).
 - Add the competitor page (`http://<pc>:8788/out/competitors.html`) as a browser source in the OBS collection.
 - In OBS: check that the branding pages (local files) pick up the style from the app; remove the "10 Heats" and "13 Heats B" scenes from the live collection (or rebuild it).

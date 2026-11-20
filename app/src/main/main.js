@@ -14,7 +14,9 @@
 // The operator window never reaches DanS or the files itself; it asks this process through preload.js.
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const QRCode = require('qrcode');
-const { encodeImage, closeWorker } = require('./imagedecode');
+const { encodeImage, prepareForOcr, closeWorker } = require('./imagedecode');
+const ocr = require('./ocr');
+const { parsePrintout, mergeResults } = require('./printout');
 const fs = require('fs');
 const crypto = require('crypto');
 const os = require('os');
@@ -29,7 +31,7 @@ const { applyPanels, togglePanel, toggleManual, cleanLetter, SORTS, moveInOrder 
 const { cleanTheme, themeFor, themeKey, PRESETS } = require('./theme');
 const { outputState, judgeView, cleanCrop, slotJudges, competitorList, competitorState } = require('./view');
 const { sortForImport, mainPhoto } = require('./gallery');
-const { numberKey, parseNumbers, drawNumbers, screenName, findByNumber, attachToDans, fromStartlist } = require('./competitors');
+const { numberKey, parseNumbers, drawNumbers, screenName, findByNumber, attachToDans } = require('./competitors');
 const csts = require('./csts');
 
 // Command-line options: --fixture=<file> plays back a saved event instead of DanS; --data=<folder> uses a
@@ -138,10 +140,12 @@ function competitorForNumber(n, origin) {
   store.updateCompetitor(key, { number: n, origin });
   return { key, created: true, found: null };
 }
-// Typed entries that existed only for a number move onto the DanS competitor once DanS gives that number.
+// Typed entries that existed only for a number move onto the DanS competitor once it has that number – from DanS,
+// or read from a printout (D-24).
 function attachCompetitors() {
   if (!raw?.startlist) return;
-  for (const m of attachToDans(fromStartlist(raw.startlist, raw.draws), store.storedCompetitors())) {
+  const numbered = new Map(competitorList(raw, store).filter((c) => c.inDans && c.number).map((c) => [c.key, c]));
+  for (const m of attachToDans(numbered, store.storedCompetitors())) {
     store.moveCompetitor(m.from, m.to);
     rememberIdts(m.to);
   }
@@ -177,6 +181,14 @@ const phoneUpload = {
     rebuild();
     return { number: Number(n), label };
   },
+};
+// A photo of a printout taken on the phone (D-24): read like a webcam shot; the review window opens in the app.
+phoneUpload.printout = async (bytes) => {
+  const r = await readPrintout(bytes);
+  if (r.error) throw new Error(r.error);
+  if (win && !win.isDestroyed()) win.webContents.send('printout', { ...r, image: `data:image/jpeg;base64,${Buffer.from(bytes).toString('base64')}` });
+  notify('Printout photo from the phone – check it in the window that opened');
+  return { competitors: r.result.competitors.length, judges: r.result.judges.length };
 };
 const newUploadKey = () => crypto.randomBytes(12).toString('base64url');
 
@@ -639,6 +651,8 @@ function setupIpc() {
   });
 
   setupCompetitorIpc();
+  setupPrintoutIpc();
+  setupPrintoutApplyIpc();
 
   // Opens an output page in the normal browser; only addresses of our own output server.
   ipcMain.handle('open-url', (_e, url) => { if (/^https?:\/\/(localhost|127\.0\.0\.1|[\d.]+):\d+\//.test(url)) shell.openExternal(url); });
@@ -831,6 +845,114 @@ function setupCompetitorIpc() {
   ipcMain.handle('qr', (_e, url) => (/^http:\/\/[\d.]+:\d+\/upload\?key=[\w-]+$/.test(url) ? QRCode.toDataURL(url, { margin: 1, width: 360 }) : null));
 }
 
+// ---------------------------------------------------------------------------------------------------------
+// IPC: reading a DanS printout with the webcam (D-17, D-24, C-39 to C-41)
+// ---------------------------------------------------------------------------------------------------------
+
+// What a printout is matched against: the offline copy (competitions with their rounds, the start list, the event's
+// judges) and the app's own lists (typed competitors, the judge gallery).
+function printoutKnown() {
+  const rawComp = new Map((raw?.competitions || []).map((c) => [c.id, c]));
+  const judges = new Map();
+  for (const j of model?.judges.values() || []) if (j.fedId) judges.set(j.fedId, { fedId: j.fedId, name: j.name, surname: j.surname });
+  for (const [fedId, g] of store.galleryEntries()) {
+    // gallery names win, as everywhere else
+    const cur = judges.get(fedId) || { fedId };
+    judges.set(fedId, { ...cur, name: g.name || cur.name || '', surname: g.surname || cur.surname || '' });
+  }
+  return {
+    competitions: (model?.competitions || []).map((c) => ({ id: c.id, number: c.number, title: c.title, rounds: (rawComp.get(c.id)?.rounds || []).map((r) => r.name) })),
+    competitors: competitorList(raw, store).map((c) => ({ key: c.key, people: c.people, label: competitorLabel(c) })),
+    judges: [...judges.values()].filter((j) => j.name || j.surname),
+  };
+}
+
+function setupPrintoutIpc() {
+  ocr.setCacheDir(path.join(store.dir, 'ocr-cache'));
+
+  // bytes = the photo (webcam frame, pasted or chosen image). The photo is read twice – as taken, and prepared
+  // (enlarged, grey, light evened out) – and the two readings are combined: each catches what the other misses.
+  // Returns { result } (see printout.js mergeResults, plus the recognised text) or { error }.
+  ipcMain.handle('printout-read', (_e, bytes) => readPrintout(bytes));
+}
+
+// Reads one photo of a printout: { result } or { error }. Used by the window and by the phone page.
+async function readPrintout(bytes) {
+  const base = path.join(app.getPath('temp'), `dp-print-${Date.now()}`);
+  const src = base + '.img', prep = base + '-prep.png';
+  try {
+    fs.writeFileSync(src, Buffer.from(bytes));
+    await prepareForOcr(src, prep);
+    const known = printoutKnown();
+    const readings = [];
+    for (const f of [prep, src]) readings.push(await ocr.recognize(f));
+    const result = mergeResults(readings.map((r) => parsePrintout(r.text, known)));
+    return { result: { ...result, text: readings[0].text, confidence: readings[0].confidence } };
+  } catch (e) {
+    return { error: `The printout could not be read: ${e.message}` };
+  } finally {
+    for (const f of [src, prep]) fs.rm(f, { force: true }, () => {});
+  }
+}
+
+function setupPrintoutApplyIpc() {
+  // Puts what the operator checked in the review window into the app. Nothing reaches the screen until Push.
+  // p = { competitionId, header: { number, title, titleEn, round }, competitors: [{ key, number }],
+  //       judges: [{ fedId, letter }], useCompetitors, useJudges, side }
+  ipcMain.handle('printout-apply', (_e, p) => {
+    const comp = model?.competitions.find((c) => c.id === p.competitionId) || null;
+    const hd = {
+      number: String(p.header?.number ?? comp?.number ?? '').trim(),
+      title: String(p.header?.title || comp?.title || '').trim(),
+      titleEn: String(p.header?.titleEn || comp?.titleEn || '').trim(),
+      round: String(p.header?.round || '').trim(),
+    };
+
+    if (p.useCompetitors) {
+      const list = competitorList(raw, store);
+      const rows = (p.competitors || []).map((r) => ({ key: r.key, n: numberKey(r.number) })).filter((r) => r.n && /^(dans|m):[\w-]{1,64}$/.test(r.key));
+      // A number belongs to one competitor: a printout number given earlier to someone else is taken back
+      const taken = new Set(rows.map((r) => r.n));
+      for (const c of list) {
+        const s = store.competitor(c.key);
+        if (s?.printNumber && taken.has(numberKey(s.printNumber)) && !rows.some((r) => r.key === c.key)) store.updateCompetitor(c.key, { printNumber: null });
+      }
+      for (const r of rows) {
+        const c = list.find((x) => x.key === r.key);
+        if (!c) continue;
+        if (r.key.startsWith('m:')) store.updateCompetitor(r.key, { number: r.n });
+        // a DanS competitor: the printed number is kept as "number from printout" unless DanS's own already says so
+        else {
+          const dansOwn = c.numberFrom === 'dans' ? c.number : null;
+          store.updateCompetitor(r.key, { printNumber: dansOwn === r.n ? null : r.n });
+        }
+      }
+      const scr = store.cfg.competitorScreen;
+      for (const k of ['number', 'title', 'titleEn', 'round']) delete scr[k];
+      Object.assign(scr, { competitionId: comp?.id || null, roundId: null, roundName: hd.round, numbers: [...taken], mode: 'round' });
+      // without a known competition the header is typed from what was read
+      if (!comp) Object.assign(scr, { number: hd.number || undefined, title: hd.title || undefined });
+      store.config.save();
+    }
+
+    if (p.useJudges) {
+      const side = p.side === 'B' && store.cfg.split ? 'B' : 'A';
+      const names = new Map(printoutKnown().judges.map((j) => [j.fedId, j]));
+      const judges = (p.judges || []).filter((j) => j.fedId && names.has(String(j.fedId)));
+      // judges of the event that are not in the gallery yet get an entry (names only), like an own selection needs
+      for (const j of judges) store.ensureJudge(String(j.fedId), { name: names.get(String(j.fedId)).name, surname: names.get(String(j.fedId)).surname });
+      store.cfg.manualPanels[side] = {
+        ...(hd.number ? { number: hd.number } : {}), ...(hd.title ? { title: hd.title } : {}),
+        ...(hd.titleEn ? { titleEn: hd.titleEn } : {}), ...(hd.round ? { round: hd.round } : {}),
+        judges: judges.map((j) => ({ fedId: String(j.fedId), letter: cleanLetter(j.letter) || '' })),
+      };
+      store.cfg.slots[side].source = 'manual';
+      store.config.save();
+    }
+    rebuild(); return rendererState();
+  });
+}
+
 // Names as typed, at most two people; each { name, surname, idt } with the IDT kept to digits.
 function cleanPeople(list) {
   return (Array.isArray(list) ? list : []).slice(0, 2).map((p) => ({
@@ -917,4 +1039,4 @@ async function start() {
 }
 
 app.whenReady().then(start);
-app.on('window-all-closed', () => { store?.flush(); server?.close(); compServer?.close(); poller?.stop(); app.quit(); });
+app.on('window-all-closed', () => { store?.flush(); server?.close(); compServer?.close(); poller?.stop(); ocr.stop(); app.quit(); });

@@ -93,6 +93,12 @@ Claude's decision log. Questions that need the user are asked in the conversatio
 - **Decision:** competitors are identified by their DanS entry (C-37); a number is shown only when DanS has one; **Refresh start list** picks numbers up later.
 - **Also told by the user:** the championship is two DanS events – Saturday: Mistrovství ČR v latinskoamerických tancích sólo; Sunday: Mistrovství ČR ve standardních tancích sólo + vyhlášení MČR 10T sólo – and a competitor's number can differ between the days. **Decision:** photos follow the dancer between the two events by IDT (C-38).
 
+### D-24 Reading DanS printouts at the MČR (2026-11-20)
+- **Asked by the user:** on both days there will probably be no connection to the DanS running the event, only the offline copy; the running competition, its judges and the competitors of each round arrive on DanS printouts. Hold the paper at the webcam and let the app read it. No printout yet – prepare as much as possible; C:\DanS may be inspected.
+- **What Claude found:** DanS can print `startlist`, `judges-comp`, `advancing`, `eliminated`, `heats-by-competitors`, `heats-by-heats`, `schedule`, `results`, `final` and more (report names inside `sart.exe`). Earlier prints are kept in `%LOCALAPPDATA%\dans`; one is a **round start list**, which carries competition number, title and round, the competitors with start numbers, and the judge panel ("Porota" with letters) on one sheet.
+- **Decision:** build reading for that sheet (and any sheet with the same kinds of lines): see C-39 to C-41 and [Docs/printout](Docs/printout/SPEC.md). Review before applying, as asked in D-17.
+- **Changes D-17:** no longer waiting for a sample – built from DanS's own earlier print; to be checked with a real paper sheet and the Logitech.
+
 ## Claude's decisions
 
 ### C-01 Technology: Electron with plain JavaScript, no framework or build step
@@ -252,3 +258,15 @@ Claude's decision log. Questions that need the user are asked in the conversatio
 ### C-38 Photos follow the dancer to the other day's event, by IDT
 - **Decision:** when a photo is added, the competitor's IDTs are noted on its stored entry (IDTs only, no names). A competitor without a photo of its own shows the photo of an entry in another event with exactly the same IDTs (one for solo, both for a couple), marked "Photo from <event>" in the window and dimmed; it is not copied and cannot be edited there. Adding a photo in the event gives it its own photo, which then wins (e.g. a Standard costume on Sunday).
 - **Why:** Saturday and Sunday are separate DanS events with different ids and different start numbers (D-23); the IDT is the only thing that stays. Showing instead of copying keeps one source of truth and costs nothing if Sunday gets new photos.
+
+### C-39 Text recognition: Tesseract in the app, offline, two readings per photo
+- **Decision:** tesseract.js 7 with the Czech `best_int` data from `@tesseract.js-data/ces` (both npm packages, pinned), run in the main process, started on first use and stopped after two idle minutes. Each photo is read twice – prepared (enlarged ×2, grey, light divided by a heavily blurred copy, in the hidden Chromium window) and as taken – and the readings are combined, a sure reading winning over an unsure one.
+- **Why:** works with no internet at the venue; no Windows language packs needed. On a real DanS sheet a whole-A4 webcam frame was unreadable in places as taken but readable prepared, and the other way round for single rows; combined, all competitors and judges were found. About 2–3 s per photo.
+
+### C-40 Matching by known names, not by layout
+- **Decision:** the parser (`printout.js`) looks for every known competitor (offline start list, typed ones) and judge (event list, gallery) in the recognised lines with a forgiving comparison, takes the start number just before a competitor's name, and reads the header by competition number + title. Sure = score ≥ 0.82 and clearly ahead of the next candidate (number not used twice); everything else is marked for checking. Couples must be on one line (or the next line without a number); the "Porota" lines are skipped for competitors; a solo competition drops couple matches.
+- **Why:** recognition errors and desk junk break any layout-based reading, but a name that is 85 % right still points at exactly one known person. Known lists exist offline (start list, judges, gallery).
+
+### C-41 Applying a printout
+- **Decision:** after review, **Apply** fills the competitor screen (competition, round name, numbers) and the **own selection** of side A (B on a split floor) with the judges, letters and header. A start number read from the sheet is stored on the DanS competitor as `printNumber` and wins over the offline copy (shown as "number from printout"); a number given before to someone else is taken back. The phone page gets a **Printout** mode that sends a photo of the sheet (2400 px); the review window then opens in the app.
+- **Why:** the printout is DanS's newest word on the day, newer than the offline copy (consistent with D-23: numbers only from DanS). An own selection needs no DanS data, so the judge panel works offline. A phone photo has far more pixels than a 1080p webcam for small print.

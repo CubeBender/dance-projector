@@ -25,6 +25,8 @@
     <button data-mode="auto" title="Read DanS every 2 seconds.">Automatic</button>
   </div>
   <button id="fetch-now" class="primary" title="Read competitions, judges and the judge allocation from DanS now">Fetch now</button>
+  <!-- reading a DanS printout with the webcam (D-24): fills the judge panel and the competitor screen -->
+  <button id="scan-open" title="Read a printed DanS sheet (start list with judges) with the webcam or a photo">Read printout…</button>
   <div class="status" id="status"><span class="dot"></span><span id="status-text">Not connected</span></div>
 </header>
 
@@ -307,9 +309,38 @@
   </form>
 </dialog>
 
+<!-- Read printout: camera / photo on the left, what was read on the right (renderer/printout.js) -->
+<dialog id="scan-dlg">
+  <div class="dlg-box scan-box">
+    <h3>Read printout</h3>
+    <div class="scan-grid">
+      <div class="scan-left">
+        <select id="scan-device" title="Camera"></select>
+        <div class="cam-view scan-view"><video id="scan-video" autoplay playsinline muted></video><img id="scan-img" alt="" hidden></div>
+        <div class="pnl-tools">
+          <button id="scan-shoot" class="primary">Read</button>
+          <button id="scan-live" hidden>Live camera</button>
+          <button id="scan-file">From file…</button>
+          <input type="file" id="scan-file-input" accept="image/*" hidden>
+          <span class="sub">or Ctrl+V a photo</span>
+        </div>
+        <div class="scan-status" id="scan-status"></div>
+      </div>
+      <div class="scan-right" id="scan-result"></div>
+    </div>
+    <div class="crop-actions">
+      <span class="sub">Nothing reaches the screen until you push.</span>
+      <span class="spacer"></span>
+      <button id="scan-close">Close</button>
+      <button id="scan-apply" class="primary" disabled>Apply</button>
+    </div>
+  </div>
+</dialog>
+
 <div class="toast" id="toast" hidden></div>
 
 <script src="app.js"></script>
 <script src="competitors.js"></script>
+<script src="printout.js"></script>
 </body>
 </html>

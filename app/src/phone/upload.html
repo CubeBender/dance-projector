@@ -29,15 +29,30 @@
   .msg.err { display: block; background: color-mix(in srgb, var(--err) 18%, var(--card)); color: var(--err); }
   .msg.busy { display: block; background: var(--card); color: var(--muted); }
   input[type=file] { display: none; }
+  /* two modes: competitor photo / photo of a DanS printout (D-24) */
+  .modes { display: flex; gap: 8px; margin: 0 0 16px; }
+  .modes button { padding: 10px 8px; font-size: 15px; }
+  .modes button.on { border-color: var(--accent); color: var(--accent); }
+  body.printout .for-photo { display: none; }
+  body:not(.printout) .for-printout { display: none; }
+  .tip { color: var(--muted); font-size: 15px; margin: 0 2px 16px; }
   #send { margin-top: 14px; }
 </style>
 </head>
 <body>
-<h1>Fotka soutěžícího <span class="en">· Competitor photo</span></h1>
+<h1>Fotka do promítání <span class="en">· Photo for the projection</span></h1>
 
+<div class="modes">
+  <button type="button" id="m-photo" class="on">Soutěžící<br><span class="en">Competitor</span></button>
+  <button type="button" id="m-print">Tisk z DanS<br><span class="en">DanS printout</span></button>
+</div>
+<p class="tip for-printout">Vyfoťte horní část listu (nadpis, soutěžící, porota) zblízka, rovně a ostře. Aplikace ji přečte a obsluha zkontroluje. · Photograph the top of the sheet, close, flat and sharp.</p>
+
+<div class="for-photo">
 <label for="number">Startovní číslo <span class="en">· Start number</span></label>
 <input id="number" class="num" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="—">
 <div class="who unknown" id="who">&nbsp;</div>
+</div>
 
 <div class="row">
   <!-- capture: opens the camera straight away; the second button picks a photo already on the phone -->
@@ -57,6 +72,15 @@ const key = new URLSearchParams(location.search).get('key') || '';
 const $ = (id) => document.getElementById(id);
 let names = new Map();   // start number -> name shown under the number field
 let photo = null;        // the shrunk photo waiting to be sent (Blob)
+let printout = false;    // mode: false = competitor photo, true = photo of a DanS printout
+function setMode(p) {
+  printout = p;
+  document.body.classList.toggle('printout', p);
+  $('m-photo').classList.toggle('on', !p); $('m-print').classList.toggle('on', p);
+  photo = null; $('preview').style.display = 'none'; msg('', ''); showWho();
+}
+$('m-photo').addEventListener('click', () => setMode(false));
+$('m-print').addEventListener('click', () => setMode(true));
 
 // Who is this number? Asked once when the page opens; a number the app doesn't know can still be sent.
 fetch(`/upload/list?key=${encodeURIComponent(key)}`).then((r) => (r.ok ? r.json() : null)).then((d) => {
@@ -69,17 +93,19 @@ function showWho() {
   const n = number(), label = names.get(n);
   $('who').textContent = !n ? ' ' : label || 'Neznámé číslo – fotka se přesto uloží · unknown number, saved anyway';
   $('who').classList.toggle('unknown', !label);
-  $('send').disabled = !n || !photo;
+  $('send').disabled = !photo || (!printout && !n);
 }
 $('number').addEventListener('input', showWho);
 
 // Phone photos are large (4–12 MB). Shrinking to 1600 px on the phone makes sending fast on venue Wi-Fi; the app
 // re-encodes it again anyway. The <img> element applies the photo's EXIF orientation, so the result is upright.
+// A printout keeps more pixels (2400 px), because the text on it must stay readable.
 function shrink(file) {
+  const max = printout ? 2400 : 1600;
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      const scale = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+      const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
       const c = document.createElement('canvas');
       c.width = Math.round(img.naturalWidth * scale); c.height = Math.round(img.naturalHeight * scale);
       c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
@@ -112,16 +138,19 @@ function msg(kind, text) { $('msg').className = 'msg ' + kind; $('msg').textCont
 
 $('send').addEventListener('click', async () => {
   const n = number();
-  if (!n || !photo) return;
+  if (!photo || (!printout && !n)) return;
   $('send').disabled = true;
   msg('busy', 'Odesílám… · Sending…');
   try {
-    const r = await fetch(`/upload/photo?key=${encodeURIComponent(key)}&number=${n}`, { method: 'POST', headers: { 'content-type': 'image/jpeg' }, body: photo });
+    const target = printout ? '/upload/printout?' : `/upload/photo?number=${n}&`;
+    const r = await fetch(`${target}key=${encodeURIComponent(key)}`, { method: 'POST', headers: { 'content-type': 'image/jpeg' }, body: photo });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.error || (r.status === 403 ? 'Odkaz už neplatí · link no longer active' : `Chyba ${r.status}`));
-    msg('ok', `✓ Uloženo k číslu ${n}${d.label ? ' – ' + d.label : ''} · Saved`);
+    msg('ok', printout
+      ? `✓ Přečteno: ${d.competitors} soutěžících, ${d.judges} rozhodčích – obsluha zkontroluje v aplikaci · Read, check in the app`
+      : `✓ Uloženo k číslu ${n}${d.label ? ' – ' + d.label : ''} · Saved`);
     // ready for the next competitor
-    photo = null; $('preview').style.display = 'none'; $('number').value = ''; showWho(); $('number').focus();
+    photo = null; $('preview').style.display = 'none'; $('number').value = ''; showWho(); if (!printout) $('number').focus();
   } catch (e) {
     msg('err', `${e.message || 'Nepodařilo se odeslat'} – zkuste znovu · try again`);
     $('send').disabled = false;

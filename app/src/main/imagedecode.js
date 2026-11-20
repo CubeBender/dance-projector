@@ -90,4 +90,51 @@ async function encodeImage(src, dest, { maxWidth = 900, rotate = 0 } = {}) {
   return { width: out.width, height: out.height };
 }
 
-module.exports = { encodeImage, closeWorker };
+// ---- preparing a photo of a printout for text recognition (D-24) ----
+// Runs inside the hidden window. Enlarges the picture (text recognition wants letters about 20–30 px tall; a
+// webcam sees a whole A4 page with letters of 8–10 px), turns it grey, and evens out the light: a heavily blurred copy
+// of the picture is the "lighting", and each pixel is divided by it, so a shadow over half the sheet disappears and
+// the paper becomes white everywhere. The blur is made cheaply by drawing the picture tiny and stretching it back.
+function prepareInPage(url, maxSide) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onerror = () => reject(new Error('could not be read – not an image, or the file is damaged'));
+    img.onload = () => {
+      const w0 = img.naturalWidth, h0 = img.naturalHeight;
+      const scale = Math.min(2, maxSide / Math.max(w0, h0));
+      const w = Math.round(w0 * scale), h = Math.round(h0 * scale);
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, w, h);
+      // lighting: 1/24 of the size, smoothed, stretched back up
+      const sw = Math.max(8, Math.round(w / 24)), sh = Math.max(8, Math.round(h / 24));
+      const small = document.createElement('canvas'); small.width = sw; small.height = sh;
+      const sctx = small.getContext('2d'); sctx.filter = 'blur(2px)'; sctx.drawImage(c, 0, 0, sw, sh);
+      const bgc = document.createElement('canvas'); bgc.width = w; bgc.height = h;
+      const bctx = bgc.getContext('2d', { willReadFrequently: true }); bctx.imageSmoothingQuality = 'high'; bctx.drawImage(small, 0, 0, w, h);
+      const px = ctx.getImageData(0, 0, w, h), bg = bctx.getImageData(0, 0, w, h).data, d = px.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        const b = 0.299 * bg[i] + 0.587 * bg[i + 1] + 0.114 * bg[i + 2] || 1;
+        const v = Math.min(255, (g / b) * 235);
+        d[i] = d[i + 1] = d[i + 2] = v;
+      }
+      ctx.putImageData(px, 0, 0);
+      resolve(c.toDataURL('image/png'));
+    };
+    img.src = url;
+  });
+}
+
+// Reads src (a photo of a printout), writes the prepared PNG to dest.
+async function prepareForOcr(src, dest, { maxSide = 3600 } = {}) {
+  const w = await getWorker();
+  const call = `(${prepareInPage.toString()})(${JSON.stringify(pathToFileURL(src).href)}, ${Number(maxSide)})`;
+  let data;
+  try { data = await w.webContents.executeJavaScript(call); }
+  catch (e) { throw new Error(String(e.message || e).replace(/^.*?Error: /, '')); }
+  fs.writeFileSync(dest, Buffer.from(data.slice(data.indexOf(',') + 1), 'base64'));
+}
+
+module.exports = { encodeImage, prepareForOcr, closeWorker };

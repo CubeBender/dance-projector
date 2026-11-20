@@ -71,3 +71,11 @@
 > The event is Mistrovství ČR v latinskoamerických tancích sólo on saturday and Mistrovství ČR ve standardních tancích sólo + vyhlášení MČR 10T sólo on sunday. It is a two day competition that is split into two events.
 
 > Competitors can have different numbers on saturday compared to sunday.
+
+## 11. Reading DanS printouts offline (2026-11-20)
+
+> Seems to work great, thanks.
+>
+> These two days, we will probably not have connection to the Dans running the event, just local copy. We wont have access to what competition is running, what the judges are and what competitors will be in the rounds. I will receive print-outs that will have the info on them. I want to aim the paper at the webcam and have the program read the data from it. I don't have the printouts yet though. But I need to prepare as much as I can in advance. The printouts will be from Dans software. If you can't see it through the web or API interface, you may look inside C:\DanS where the program sits.
+>
+> First commit, then proceed.

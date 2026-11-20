@@ -27,7 +27,9 @@ async def main():
     for _ in range(50):
         try:
             tabs = json.load(urllib.request.urlopen(f"http://127.0.0.1:{PORT}/json"))
-            page = next(t for t in tabs if t["type"] == "page")
+            # CDP_PAGE="renderer/index.html" picks the page whose URL contains it (the app also has hidden windows)
+            want = os.environ.get("CDP_PAGE")
+            page = next(t for t in tabs if t["type"] == "page" and (not want or want in t.get("url", "")))
             break
         except Exception:
             time.sleep(0.3)

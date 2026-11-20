@@ -20,6 +20,8 @@
 // Stored entry (competitors.json → { "<event key>": { "<key>": entry } }):
 //   {
 //     number,                                  only for 'm:' entries (typed, or the number a phone photo was sent for)
+//     printNumber,                             'dans:' entries: the number read from a DanS printout (D-24). On the day the
+//                                              offline copy has no numbers, the printed sheet has; it wins while set
 //     kind: 'solo' | 'couple',                 only when set in the app
 //     people: [{ name, surname, idt }],        only when edited in the app (replaces the DanS people as a whole)
 //     club,                                    optional
@@ -107,7 +109,9 @@ function mergeCompetitors(dans, stored = {}) {
     people = Array.from({ length: kind === 'couple' ? 2 : 1 }, (_, i) => ({ name: '', surname: '', idt: '', ...people[i] }));
     return {
       key, kind, people,
-      number: d ? d.number : key.startsWith('m:') ? numberKey(s.number) : null,
+      number: d ? numberKey(s.printNumber) || d.number : key.startsWith('m:') ? numberKey(s.number) : null,
+      // where the number comes from: 'dans' (start list / draw), 'print' (read from a printout), 'typed'
+      numberFrom: d ? (numberKey(s.printNumber) ? 'print' : d.number ? 'dans' : null) : numberKey(s.number) ? 'typed' : null,
       club: s.club ?? d?.club ?? '',
       photos: s.photos || [], main: s.main || null,
       inDans: !!d, stored: !!stored[key], origin: d ? 'dans' : key.startsWith('dans:') ? 'gone' : s.origin || 'manual',

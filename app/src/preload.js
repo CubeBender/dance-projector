@@ -57,6 +57,10 @@ contextBridge.exposeInMainWorld('dp', {
   compInRound: (number, on) => ipcRenderer.invoke('comp-in-round', number, on),
   compLoadRound: (compId) => ipcRenderer.invoke('comp-load-round', compId),
   compRefreshStartlist: () => ipcRenderer.invoke('comp-refresh-startlist'), // start numbers given since the last read
+  // reading a DanS printout (D-24): bytes of a photo -> { result } | { error }; apply = what the operator checked
+  printoutRead: (bytes) => ipcRenderer.invoke('printout-read', bytes),
+  printoutApply: (p) => ipcRenderer.invoke('printout-apply', p),
+  onPrintout: (fn) => ipcRenderer.on('printout', (_e, r) => fn(r)), // a printout photo arrived from the phone
   pushCompetitors: () => ipcRenderer.invoke('push-competitors'),
   // the list. A competitor is addressed by its key ('dans:<id>' or 'm:<id>', see competitors.js), not its number,
   // because many have no start number yet. New: { number (optional), kind, people: [{ name, surname, idt }] }

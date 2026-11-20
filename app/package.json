@@ -9,13 +9,15 @@
     "fixture": "electron . --fixture=fixtures/sample.json",
     "snapshot": "node scripts/snapshot.js",
     "anonymize": "node scripts/anonymize-fixture.js",
-    "test": "node scripts/test-model.js && node scripts/test-store.js && node scripts/test-workflow.js && node scripts/test-gallery.js && node scripts/test-competitors.js",
+    "test": "node scripts/test-model.js && node scripts/test-store.js && node scripts/test-workflow.js && node scripts/test-gallery.js && node scripts/test-competitors.js && node scripts/test-printout.js",
     "preview": "node scripts/preview-server.js"
   },
   "devDependencies": {
     "electron": "^44.8.0"
   },
   "dependencies": {
-    "qrcode": "1.5.4"
+    "@tesseract.js-data/ces": "1.0.0",
+    "qrcode": "1.5.4",
+    "tesseract.js": "7.0.0"
   }
 }

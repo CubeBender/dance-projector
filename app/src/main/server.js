@@ -14,6 +14,7 @@
 //   /upload           the phone page (takes a photo and sends it with a start number)
 //   /upload/list      start numbers with names, so the phone can show who a number is
 //   /upload/photo     POST: one image, becomes the main photo of that start number
+//   /upload/printout  POST: a photo of a DanS printout, read in the app (D-24) – the review window opens there
 // Every /upload request must carry the secret key from the app's QR code (?key=…); without it: 403.
 const http = require('http');
 const crypto = require('crypto');
@@ -35,7 +36,8 @@ function safeJoin(root, rel) {
 
 class OutputServer {
   // upload: only for the competitor server – { enabled(): bool, key(): string, page: file of the phone page,
-  //   list(): [{ number, label }], receive(number, Buffer): Promise<{ number, label }> }
+  //   list(): [{ number, label }], receive(number, Buffer): Promise<{ number, label }>,
+  //   printout(Buffer): Promise<{ competitors, judges }> }
   constructor({ outputsDir, photoDir, mediaDir = null, brandDir = null, upload = null }) {
     this.upload = upload;
     this.outputsDir = outputsDir;
@@ -124,7 +126,7 @@ class OutputServer {
     const p = url.pathname;
     if (req.method === 'GET' && p === '/upload') return this.serveFile(res, up.page, { 'cache-control': 'no-store' });
     if (req.method === 'GET' && p === '/upload/list') return json(200, { competitors: up.list() });
-    if (req.method === 'POST' && p === '/upload/photo') {
+    if (req.method === 'POST' && (p === '/upload/photo' || p === '/upload/printout')) {
       const number = url.searchParams.get('number');
       if (!/^image\/(jpeg|png|webp)$/i.test(String(req.headers['content-type'] || '').split(';')[0].trim())) { json(415, { error: 'Send a JPEG, PNG or WebP image' }); req.resume(); return; }
       const limit = 20 * 1024 * 1024; // 20 MB: any phone photo fits, the phone page also shrinks it first
@@ -133,7 +135,7 @@ class OutputServer {
       req.on('data', (c) => { size += c.length; if (size > limit) { tooBig = true; req.destroy(); } else chunks.push(c); });
       req.on('end', async () => {
         if (tooBig) return;
-        try { json(200, await up.receive(number, Buffer.concat(chunks))); }
+        try { json(200, p === '/upload/printout' ? await up.printout(Buffer.concat(chunks)) : await up.receive(number, Buffer.concat(chunks))); }
         catch (e) { json(400, { error: String(e.message || e) }); }
       });
       return;

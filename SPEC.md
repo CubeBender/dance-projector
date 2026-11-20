@@ -11,6 +11,7 @@ Projection for dancesport competitions, built in OBS. Live competition data come
 | Output pages | Web pages served by the app, used as OBS browser sources | [Docs/output-pages](Docs/output-pages/SPEC.md) |
 | OBS show | Scenes, transitions, media handling, Touch Portal control | [Docs/obs-show](Docs/obs-show/SPEC.md) |
 | Competitors | Photos and names of semifinal / final competitors on their own projection port; phone upload, webcam, ČSTS lookup | [Docs/competitors](Docs/competitors/SPEC.md) |
+| Printout reading | Webcam / phone photo of a DanS round start list fills the judge panel and the competitor screen, offline | [Docs/printout](Docs/printout/SPEC.md) |
 
 ## Data flow
 
