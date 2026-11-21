@@ -54,6 +54,9 @@ const DEFAULT_CONFIG = {
   // Phone upload page (C-34): off until switched on; key = the secret part of the link
   phoneUpload: { enabled: false, key: null },
   webcamId: null,        // camera chosen in the Webcam window (C-35)
+  // How far the printout camera picture must be turned (degrees clockwise) to make the text upright: a webcam turned
+  // on its side fits a whole A4 page. Found automatically and remembered, or set with the Turn button (C-42).
+  printoutRotate: 0,
 };
 
 class JsonFile {

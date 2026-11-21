@@ -58,7 +58,8 @@ contextBridge.exposeInMainWorld('dp', {
   compLoadRound: (compId) => ipcRenderer.invoke('comp-load-round', compId),
   compRefreshStartlist: () => ipcRenderer.invoke('comp-refresh-startlist'), // start numbers given since the last read
   // reading a DanS printout (D-24): bytes of a photo -> { result } | { error }; apply = what the operator checked
-  printoutRead: (bytes) => ipcRenderer.invoke('printout-read', bytes),
+  printoutRead: (bytes, opts = {}) => ipcRenderer.invoke('printout-read', bytes, opts),
+  printoutRotate: (deg) => ipcRenderer.invoke('printout-rotate', deg),
   printoutApply: (p) => ipcRenderer.invoke('printout-apply', p),
   onPrintout: (fn) => ipcRenderer.on('printout', (_e, r) => fn(r)), // a printout photo arrived from the phone
   pushCompetitors: () => ipcRenderer.invoke('push-competitors'),

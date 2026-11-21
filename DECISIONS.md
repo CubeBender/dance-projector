@@ -99,6 +99,10 @@ Claude's decision log. Questions that need the user are asked in the conversatio
 - **Decision:** build reading for that sheet (and any sheet with the same kinds of lines): see C-39 to C-41 and [Docs/printout](Docs/printout/SPEC.md). Review before applying, as asked in D-17.
 - **Changes D-17:** no longer waiting for a sample – built from DanS's own earlier print; to be checked with a real paper sheet and the Logitech.
 
+### D-25 Fetch and pick the competition inside Judge selection (2026-11-21)
+- **Asked by the user:** try showing the judges straight from DanS: in Judge selection, choose From DanS, fetch, pick the competition, and its judge panel is selected. The Saturday event (CS1747) has two competitions with a panel drawn.
+- **Decision:** see C-43. Changes D-24 for today only in that DanS is reachable over the venue network after all; printouts stay the fallback.
+
 ## Claude's decisions
 
 ### C-01 Technology: Electron with plain JavaScript, no framework or build step
@@ -270,3 +274,24 @@ Claude's decision log. Questions that need the user are asked in the conversatio
 ### C-41 Applying a printout
 - **Decision:** after review, **Apply** fills the competitor screen (competition, round name, numbers) and the **own selection** of side A (B on a split floor) with the judges, letters and header. A start number read from the sheet is stored on the DanS competitor as `printNumber` and wins over the offline copy (shown as "number from printout"); a number given before to someone else is taken back. The phone page gets a **Printout** mode that sends a photo of the sheet (2400 px); the review window then opens in the app.
 - **Why:** the printout is DanS's newest word on the day, newer than the offline copy (consistent with D-23: numbers only from DanS). An own selection needs no DanS data, so the judge panel works offline. A phone photo has far more pixels than a 1080p webcam for small print.
+
+### C-42 Printout camera on its side: find the way up automatically (2026-11-21)
+- **Reported by the user:** with the webcam turned vertical (to fit the whole page), reading a "Soutěžní listina" found 0 judges and 0 competitors.
+- **Decision:** a camera frame is read first turned by the remembered amount (`printoutRotate` in config). If that finds fewer than two known things and Tesseract's confidence is below 65 %, the other quarter turns are tried (90°, 270°, 180°) and the best wins (most known things, then confidence) and is remembered, so the next read is quick. Photos from a file, Ctrl+V or the phone start upright and do not change the camera's turn. The window shows the live picture turned the same way and has a **↻ Turn** button to set it by hand.
+- **Why:** Tesseract reads only upright text; text on its side gives junk with low confidence, so the comparison is clear. A camera on its side puts more pixels on an A4 page: on simulated frames of the real start list the sideways page read better (3/3 competitors and 7/7 judges, all sure, all letters) than the whole page upright. The first sideways read takes 8–11 s, then about 5 s.
+
+### C-43 From DanS side gets its own Fetch and competition list (2026-11-21)
+- **Decision (Claude):** the From DanS block of each side starts with a bar: a **Fetch from DanS** button (the same 3-request read as Fetch now in the top bar, sharing its busy state) with the time of the data, and a **Competition** list of the event's competitions with round and judge count ("9 judges" / "no panel yet"). Choosing one does what Show / A / B does in Competitions (`assign`), so both places stay in step; "– choose –" takes it off the side. In Manual mode the bar does not fetch but offers **Switch to On demand**; in Automatic mode it only says data comes by itself; with no event chosen it points at the top bar.
+- **Why:** reuses the existing read and the existing slot assignment, so no new DanS paths and nothing new to keep in sync. The judge count tells at a glance which competitions already have a drawn panel. Manual mode promises zero DanS contact, so it needs a deliberate switch.
+- **Checked:** against the venue DanS (GET only) on CS1747 in a separate test instance: Fetch from DanS read the data, the list showed competitions 2 and 4 with 9 judges and 1, 3, 5 with no panel; choosing 2 showed the 9 judges as "Panel from DanS" in the prepared preview. `npm test` passes.
+
+### C-44 Header card is a style setting (2026-11-21)
+- **Asked by the user:** make the card with competition number, title and round above "Porota" / "Soutěžící" optional, with a checkbox.
+- **Decision (Claude):** one checkbox **Competition header card** in the Style tab, stored per event as `theme.header` (default on). The pages' shared `header()` returns nothing when it is off, so judges, competitors (and heats) follow together; the cards are measured again and grow into the freed height. Being part of the style, it reaches the screen with the next push of each projection.
+- **Why:** the style already travels to both output servers and is per event, so no new plumbing; one switch keeps the two screens consistent.
+- **Checked:** in a test instance: unchecking marks Style as not on screen yet, both draft states carry `header: false`, the judges page shows Porota at the top with 9 bigger cards. `npm test` passes.
+
+### C-45 Separate header switches for judges and competitors (2026-11-21, changes C-44)
+- **Asked by the user:** one checkbox for the judges page and one for the competitors page instead of the shared one.
+- **Decision (Claude):** `theme.header` replaced by `headerJudges` and `headerCompetitors` (both default on). The competitor page reads `headerCompetitors`; every other page (judges, heats) reads `headerJudges`. A style saved with the old single `header` keeps its value for both.
+- **Checked:** in a test instance: an old `header: false` showed as both unticked; ticking judges only gave `true / false` in both draft states, the judges page drew its card, the competitor page's `header()` returned nothing. `npm test` passes.

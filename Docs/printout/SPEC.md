@@ -55,4 +55,13 @@ recognised text on request. **Apply**:
 | clean scan | ✓ | 3/3 sure | 7/7 with letters |
 | webcam, top of the sheet filling the frame | ✓ | 3/3 (after combining) | 7/7 with letters |
 | webcam, whole A4 in frame | ✓ | 3/3 sure | 7/7, 2 without letter (check), 1 letter misread |
-One read takes about 2–3 s (two recognitions).
+| webcam on its side, whole A4 (either way round) | ✓ | 3/3 sure | 7/7 sure, all letters |
+
+One read takes about 2–3 s (two recognitions); about 5 s for a full page; the first read of a picture on its side
+8–11 s while the app finds the way up (C-42).
+
+## Which way up (C-42)
+A webcam turned on its side fits a whole A4 page with more pixels on it. The app finds the way up by itself: the
+remembered turn first, the other quarter turns when that reads as junk (nothing known found, confidence below 65 %);
+the turn that worked is remembered for the camera. The live picture is shown turned; **↻ Turn** sets it by hand.
+Photos from a file, Ctrl+V or the phone start upright and leave the camera's turn alone.

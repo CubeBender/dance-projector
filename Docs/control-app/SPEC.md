@@ -39,6 +39,7 @@ Electron desktop app for the operator. Top bar, four tabs (Competitions, Judge p
 - One block per screen side (A, and B on a split floor) with a source switch: **From DanS** or **Own selection**.
 - **Own selection** (no DanS needed): optional No., competition title in both languages and round; the chosen judges as rows with an editable letter (A, B, C… given in order of clicking, gaps filled; A–Z/0–9, max 3; a letter used twice is pointed out) and ×; the gallery below as toggle buttons with a search box. Stored in `config.json` (`slots.X.source`, `manualPanels.X`). Pressing **Show** on a DanS competition switches the side back to From DanS.
 - **From DanS:**
+- A bar at the top (C-43): **Fetch from DanS** (On demand; Manual offers **Switch to On demand**, Automatic needs none) with the time of the data, and the **Competition** list (number, title, round, judge count). Choosing a competition is the same as Show / A / B in Competitions.
 - One block per competition on screen (A, and B on a split floor): title, round, where the panel comes from (**Panel from DanS**, **Picked by hand** with the difference to DanS, or **No panel yet**), number selected.
 - All judges of the event as toggle buttons (photo, letter, name). Judges in the DanS panel have a green ring on their letter.
 - Clicking edits the panel; the first edit of a DanS panel starts from the DanS list. **Use DanS panel** forgets the edit; **Clear** empties the panel.
@@ -46,6 +47,7 @@ Electron desktop app for the operator. Top bar, four tabs (Competitions, Judge p
 - **Order on screen** (C-28), per side: **Surname** (default), **First name**, **Letter (DanS order)**, **Custom**. The panel is listed in screen order with ↑ / ↓; an arrow switches to Custom. Stored as `slots.X.judgeSort` and `slots.X.order` (IDTs). Own selections list their rows in screen order with the same arrows.
 
 ## 4c. Style (D-15)
+- **Header:** two checkboxes (C-44, C-45): **On the judges page (above Porota)** (also heats) and **On the competitors page (above Soutěžící)**. Off hides the number / title / round card, so the page starts with Porota / Soutěžící and the cards use the freed height. Part of the style (`theme.headerJudges`, `theme.headerCompetitors`), so each needs a push of its projection.
 - **Sponsor strip in OBS:** px kept clear at the bottom (0 = none); pages leave it + 24 px free and move up to 24 px from the top (C-30).
 - **Event colours:** ready-made styles, one click applies them to the current event (C-27). Now: **MČR SÓLO 2026**.
 - One style per event: accent, second colour, background colour, panel colour, text colour, panel opacity (0 = no plates); background **Moving lights**, **Solid colour**, **Image** or **Transparent** (nothing; the background is added in OBS; previews show a checkerboard) (drop or choose; re-encoded to max 1920 px in `<userData>/media/`; darkening 0–90 %). **Reset style to default**.

@@ -9,7 +9,50 @@
 //
 // Left: live camera view, or the photo that was read. Right: the result as editable rows.
 
-const scan = { stream: null, result: null, image: null, rows: null };
+const scan = { stream: null, result: null, image: null, rows: null, bytes: null, rawUrl: null };
+const ROTS = [0, 90, 180, 270];
+
+// ---- which way up (C-42) ----
+// A camera turned on its side fits a whole A4 page, but its picture lies on its side. The live view is shown turned
+// by the remembered amount (S.printoutRotate); reading tries the other turns by itself if needed and remembers the
+// one that worked. The Turn button sets it by hand.
+function showTurn() {
+  const v = $('#scan-video');
+  v.classList.remove('rot90', 'rot180', 'rot270');
+  if (S.printoutRotate) v.classList.add('rot' + S.printoutRotate);
+}
+$('#scan-turn').addEventListener('click', async () => {
+  // a photo on show: read it again a quarter turn further (a camera frame also changes the camera's turn)
+  if (scan.bytes) {
+    const next = ROTS[(ROTS.indexOf(scan.turn || 0) + 1) % 4];
+    if (scan.camera) { applyOr(await window.dp.printoutRotate(next)); S.printoutRotate = next; }
+    readImage(scan.bytes, scan.rawUrl, { rotate: next, camera: scan.camera });
+    return;
+  }
+  // live view: turn the picture of the camera
+  const next = ROTS[(ROTS.indexOf(S.printoutRotate || 0) + 1) % 4];
+  applyOr(await window.dp.printoutRotate(next));
+  S.printoutRotate = next;
+  showTurn();
+});
+// a picture turned deg degrees clockwise, for showing the photo the way it was read
+function turnedUrl(url, deg) {
+  if (!deg) return Promise.resolve(url);
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const side = deg === 90 || deg === 270;
+      const c = document.createElement('canvas');
+      c.width = side ? img.naturalHeight : img.naturalWidth; c.height = side ? img.naturalWidth : img.naturalHeight;
+      const ctx = c.getContext('2d');
+      ctx.translate(c.width / 2, c.height / 2); ctx.rotate((deg * Math.PI) / 180);
+      ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+      resolve(c.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => resolve(url);
+    img.src = url;
+  });
+}
 const dlg = $('#scan-dlg');
 
 function scanStatus(text, kind = '') { const el = $('#scan-status'); el.textContent = text; el.className = 'scan-status ' + kind; }
@@ -25,7 +68,8 @@ async function startScanCam(deviceId) {
   } catch (e) { scanStatus(`The camera could not be opened: ${e.message}`, 'err'); }
 }
 async function showLive() {
-  scan.image = null;
+  scan.image = null; scan.bytes = null; scan.rawUrl = null;
+  showTurn();
   $('#scan-img').hidden = true; $('#scan-video').hidden = false; $('#scan-shoot').hidden = false; $('#scan-live').hidden = true;
   await startScanCam(S.webcamId);
   const cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput');
@@ -39,14 +83,21 @@ $('#scan-device').addEventListener('change', (e) => { startScanCam(e.target.valu
 
 // ---- reading ----
 // bytes: Uint8Array of a JPEG/PNG; url: something the <img> can show
-async function readImage(bytes, url) {
+// rotate: a turn chosen with the Turn button (otherwise the app finds the way up itself)
+// camera: a frame of the live camera (starts at the camera's remembered turn); otherwise a photo, which starts upright
+async function readImage(bytes, url, { rotate = null, camera = false } = {}) {
   stopScanCam();
-  scan.image = url;
-  $('#scan-img').src = url; $('#scan-img').hidden = false; $('#scan-video').hidden = true;
+  scan.image = url; scan.bytes = bytes; scan.rawUrl = url; scan.camera = camera;
+  const shown = rotate ?? (camera ? S.printoutRotate || 0 : 0);
+  scan.turn = shown;
+  $('#scan-img').src = await turnedUrl(url, shown); $('#scan-img').hidden = false; $('#scan-video').hidden = true;
   $('#scan-shoot').hidden = true; $('#scan-live').hidden = false;
-  scanStatus('Reading the printout… (a few seconds; the first read also starts the text recognition)');
+  scanStatus('Reading the printout… (a few seconds; the first read also starts the text recognition; a picture on its side takes longer the first time)');
   $('#scan-apply').disabled = true;
-  const r = await window.dp.printoutRead(bytes);
+  const r = await window.dp.printoutRead(bytes, { rotate, camera });
+  // the app may have found another way up: show the photo that way (and, for the camera, the live view from now on)
+  if (r.result && r.result.rotate !== shown) $('#scan-img').src = await turnedUrl(url, r.result.rotate);
+  if (r.result) { scan.turn = r.result.rotate; if (camera) { S.printoutRotate = r.result.rotate; showTurn(); } }
   showResult(r);
 }
 function showResult(r) {
@@ -66,7 +117,7 @@ function grabFrame() {
   const url = c.toDataURL('image/jpeg', 0.95);
   return { url, bytes: Uint8Array.from(atob(url.slice(url.indexOf(',') + 1)), (ch) => ch.charCodeAt(0)) };
 }
-$('#scan-shoot').addEventListener('click', () => { const f = grabFrame(); if (f) readImage(f.bytes, f.url); });
+$('#scan-shoot').addEventListener('click', () => { const f = grabFrame(); if (f) readImage(f.bytes, f.url, { camera: true }); });
 $('#scan-live').addEventListener('click', showLive);
 $('#scan-file').addEventListener('click', () => $('#scan-file-input').click());
 $('#scan-file-input').addEventListener('change', async (e) => {

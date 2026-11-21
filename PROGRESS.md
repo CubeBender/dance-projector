@@ -42,6 +42,11 @@
 - 2026-11-20 Committed all work so far (`4416078`).
 - 2026-11-20 **Reading DanS printouts** (D-24, C-39 to C-41): found DanS's report list in `sart.exe` and an earlier round start list PDF; offline Tesseract (Czech) with image preparation; name-based parser (`printout.js`) with tests (`scripts/test-printout.js`, in `npm test`); **Read printout…** window (webcam, Ctrl+V, file) with review and Apply to the competitor screen and the own judge selection; phone page Printout mode; number from printout. Checked in a Manual-mode test instance with the real Pardubice offline copy and simulated webcam frames of the real sheet: header, 3/3 competitors, 7/7 judges (2 letters to check on the whole-A4 frame); outputs drawn from it.
 
+- 2026-11-21 Printout camera on its side (C-42): the app finds the way up by itself and remembers it, live view turned, ↻ Turn button. Checked with simulated sideways frames of the real start list (both ways round): 3/3 competitors, 7/7 judges, all sure.
+
+- 2026-11-21 **Judges straight from DanS** (D-25, C-43): Judge selection → From DanS has Fetch from DanS and a Competition list with judge counts. Checked against the venue DanS on CS1747: competitions 2 and 4 show their 9-judge panels.
+- 2026-11-21 **Optional header card** (C-44): Style tab checkboxes (judges and competitors separately, C-45) hide the competition card above Porota / Soutěžící.
+
 ## In progress
 - Nothing running.
 

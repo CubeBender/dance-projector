@@ -358,6 +358,7 @@ function rendererState() {
       urls: compAddr && store.cfg.phoneUpload?.key ? lanAddresses().map((ip) => `http://${ip}:${compAddr.port}/upload?key=${store.cfg.phoneUpload.key}`) : [],
     },
     webcamId: store.cfg.webcamId || null,
+    printoutRotate: store.cfg.printoutRotate || 0,
     outputs: outputAddr ? {
       port: outputAddr.port,
       base,
@@ -873,25 +874,65 @@ function setupPrintoutIpc() {
   // bytes = the photo (webcam frame, pasted or chosen image). The photo is read twice – as taken, and prepared
   // (enlarged, grey, light evened out) – and the two readings are combined: each catches what the other misses.
   // Returns { result } (see printout.js mergeResults, plus the recognised text) or { error }.
-  ipcMain.handle('printout-read', (_e, bytes) => readPrintout(bytes));
+  ipcMain.handle('printout-read', (_e, bytes, o) => readPrintout(bytes, o || {}));
+  // the Turn button in the Read printout window: the camera picture is shown and read turned this far
+  ipcMain.handle('printout-rotate', (_e, deg) => {
+    const r = Number(deg);
+    store.updateConfig({ printoutRotate: [0, 90, 180, 270].includes(r) ? r : 0 });
+    return rendererState();
+  });
 }
 
 // Reads one photo of a printout: { result } or { error }. Used by the window and by the phone page.
-async function readPrintout(bytes) {
+//
+// Which way up (C-42): Tesseract reads only upright text, and a webcam turned on its side (to fit a whole A4 page)
+// gives a picture lying on its side. The photo is first read turned by the remembered amount (printoutRotate). If
+// that reading finds nothing known and the text recognition itself is unsure, the other three turns are tried and
+// the best one wins – and is remembered, so the next read is quick again. Text lying on its side reads as junk with
+// low confidence, so the comparison is clear.
+//   opts.rotate: a turn chosen by hand – used as it is, nothing else is tried.
+//   opts.camera: a frame of the printout camera – starts at the remembered turn and updates it. Any other photo
+//                (file, Ctrl+V, phone) starts upright and leaves the camera's turn alone.
+async function readPrintout(bytes, opts = {}) {
   const base = path.join(app.getPath('temp'), `dp-print-${Date.now()}`);
-  const src = base + '.img', prep = base + '-prep.png';
+  const src = base + '.img', prep = base + '-prep.png', plain = base + '-plain.png';
   try {
     fs.writeFileSync(src, Buffer.from(bytes));
-    await prepareForOcr(src, prep);
     const known = printoutKnown();
-    const readings = [];
-    for (const f of [prep, src]) readings.push(await ocr.recognize(f));
-    const result = mergeResults(readings.map((r) => parsePrintout(r.text, known)));
-    return { result: { ...result, text: readings[0].text, confidence: readings[0].confidence } };
+    // one reading of the enhanced picture, turned by rot degrees
+    const readAt = async (rot) => {
+      await prepareForOcr(src, prep, { rotate: rot });
+      const reading = await ocr.recognize(prep);
+      const parsed = parsePrintout(reading.text, known);
+      const found = parsed.competitors.length + parsed.judges.length + (parsed.header?.compId ? 1 : 0);
+      return { rot, reading, parsed, found };
+    };
+    // good enough to stop looking: something known was found, or the text itself was read confidently
+    // (an upright page of names nobody knows yet still reads at 70+ %, a page on its side well below 50 %)
+    const good = (r) => r.found >= 2 || r.reading.confidence >= 65;
+    const better = (a, b) => (a.found !== b.found ? a.found > b.found : a.reading.confidence > b.reading.confidence);
+
+    const manual = opts.rotate != null && [0, 90, 180, 270].includes(Number(opts.rotate));
+    const first = manual ? Number(opts.rotate) : opts.camera ? (store.cfg.printoutRotate || 0) : 0;
+    let best = await readAt(first);
+    if (!manual && !good(best)) {
+      // the usual turns first: on its side either way, then upside down
+      for (const rot of [90, 270, 180, 0].filter((x) => x !== first)) {
+        const r = await readAt(rot);
+        if (better(r, best)) best = r;
+        if (good(best)) break;
+      }
+      if (opts.camera && best.rot !== (store.cfg.printoutRotate || 0)) store.updateConfig({ printoutRotate: best.rot });
+    }
+    // second reading: the same turn, not enhanced (see C-39 – each reading catches rows the other misses)
+    await prepareForOcr(src, plain, { rotate: best.rot, enhance: false });
+    const second = parsePrintout((await ocr.recognize(plain)).text, known);
+    const result = mergeResults([best.parsed, second]);
+    return { result: { ...result, text: best.reading.text, confidence: best.reading.confidence, rotate: best.rot } };
   } catch (e) {
     return { error: `The printout could not be read: ${e.message}` };
   } finally {
-    for (const f of [src, prep]) fs.rm(f, { force: true }, () => {});
+    for (const f of [src, prep, plain]) fs.rm(f, { force: true }, () => {});
   }
 }
 

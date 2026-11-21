@@ -168,6 +168,11 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .pnl-tools .src.dans { background: rgba(47,214,123,0.12); color: var(--run); }
 .pnl-tools .count { color: var(--muted); font-size: 12.5px; margin-right: auto; }
 .pnl-tools button { padding: 3px 10px; font-size: 12.5px; }
+/* Judge selection, From DanS: fetch button and competition list (dansSource in app.js) */
+.dans-source { padding: 8px 10px; border-radius: 6px; background: var(--panel-2); }
+.dans-source .spacer { flex: 1; }
+.comp-pick-l { display: flex; align-items: center; gap: 6px; }
+.comp-pick { max-width: 560px; min-width: 260px; }
 .pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
 .pick-j { display: grid; grid-template-columns: 30px auto 1fr; align-items: center; gap: 8px; text-align: left; padding: 4px 8px 4px 4px; opacity: 0.55; }
 .pick-j:hover { opacity: 0.85; }
@@ -314,7 +319,15 @@ button.danger-fill { background: var(--err); border-color: var(--err); color: #f
 /* ---- Read printout window (D-24) ---- */
 .scan-box { width: min(1400px, 94vw); }
 .scan-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(380px, 1fr); gap: 16px; margin-top: 8px; }
-.scan-left select { width: 100%; margin-bottom: 8px; }
+.scan-cam-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.scan-cam-row select { flex: 1; min-width: 0; }
+.scan-view { overflow: hidden; }
+/* a camera on its side: the live picture is turned so the sheet stands upright; turned a quarter, a 16:9 picture
+   must shrink to 9/16 of its width to fit the 16:9 box */
+.scan-view video { transition: transform 0.2s; }
+.scan-view video.rot90 { transform: rotate(90deg) scale(0.5625); }
+.scan-view video.rot180 { transform: rotate(180deg); }
+.scan-view video.rot270 { transform: rotate(270deg) scale(0.5625); }
 .scan-view { aspect-ratio: 16 / 9; }
 .scan-view img { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
 .scan-status { margin-top: 8px; font-size: 13px; min-height: 1.4em; }

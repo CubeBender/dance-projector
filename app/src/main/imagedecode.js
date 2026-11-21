@@ -95,18 +95,27 @@ async function encodeImage(src, dest, { maxWidth = 900, rotate = 0 } = {}) {
 // webcam sees a whole A4 page with letters of 8–10 px), turns it grey, and evens out the light: a heavily blurred copy
 // of the picture is the "lighting", and each pixel is divided by it, so a shadow over half the sheet disappears and
 // the paper becomes white everywhere. The blur is made cheaply by drawing the picture tiny and stretching it back.
-function prepareInPage(url, maxSide) {
+// rotate: degrees clockwise (0, 90, 180, 270) that make the text upright – a webcam turned on its side to fit a
+// whole A4 page gives a picture lying on its side, and Tesseract only reads upright text.
+// enhance: false = only enlarge and turn (the "as taken" reading, see C-39).
+function prepareInPage(url, maxSide, rotate, enhance) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onerror = () => reject(new Error('could not be read – not an image, or the file is damaged'));
     img.onload = () => {
       const w0 = img.naturalWidth, h0 = img.naturalHeight;
       const scale = Math.min(2, maxSide / Math.max(w0, h0));
-      const w = Math.round(w0 * scale), h = Math.round(h0 * scale);
+      const sw0 = Math.round(w0 * scale), sh0 = Math.round(h0 * scale);   // size of the photo, enlarged
+      const side = rotate === 90 || rotate === 270;                     // a quarter turn swaps width and height
+      const w = side ? sh0 : sw0, h = side ? sw0 : sh0;
       const c = document.createElement('canvas'); c.width = w; c.height = h;
       const ctx = c.getContext('2d', { willReadFrequently: true });
       ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(img, 0, 0, w, h);
+      // turn around the centre of the new canvas, then draw the photo centred on it
+      ctx.translate(w / 2, h / 2); ctx.rotate((rotate * Math.PI) / 180);
+      ctx.drawImage(img, -sw0 / 2, -sh0 / 2, sw0, sh0);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      if (!enhance) { resolve(c.toDataURL('image/png')); return; }
       // lighting: 1/24 of the size, smoothed, stretched back up
       const sw = Math.max(8, Math.round(w / 24)), sh = Math.max(8, Math.round(h / 24));
       const small = document.createElement('canvas'); small.width = sw; small.height = sh;
@@ -128,9 +137,11 @@ function prepareInPage(url, maxSide) {
 }
 
 // Reads src (a photo of a printout), writes the prepared PNG to dest.
-async function prepareForOcr(src, dest, { maxSide = 3600 } = {}) {
+// rotate: degrees clockwise to make the text upright; enhance: false = only enlarge and turn.
+async function prepareForOcr(src, dest, { maxSide = 3600, rotate = 0, enhance = true } = {}) {
   const w = await getWorker();
-  const call = `(${prepareInPage.toString()})(${JSON.stringify(pathToFileURL(src).href)}, ${Number(maxSide)})`;
+  const rot = [0, 90, 180, 270].includes(Number(rotate)) ? Number(rotate) : 0;
+  const call = `(${prepareInPage.toString()})(${JSON.stringify(pathToFileURL(src).href)}, ${Number(maxSide)}, ${rot}, ${enhance ? 'true' : 'false'})`;
   let data;
   try { data = await w.webContents.executeJavaScript(call); }
   catch (e) { throw new Error(String(e.message || e).replace(/^.*?Error: /, '')); }

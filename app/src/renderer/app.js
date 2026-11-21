@@ -383,7 +383,7 @@ function renderSettings() {
 
 // ---- Judge selection tab ----
 // One block per screen side (A, and B when the floor is split). Each side shows one of two sources:
-//   From DanS     – the panel of the competition chosen in Competitions (DanS allocation, editable)
+//   From DanS     – the panel of a DanS competition, chosen here or in Competitions (DanS allocation, editable)
 //   Own selection – judges picked from the gallery with letters set here; needs no DanS data at all (D-19)
 const PANEL_SOURCE = {
   dans: 'Panel from DanS',
@@ -513,17 +513,54 @@ function manualBlock(k) {
 }
 
 // Panel of the DanS competition shown on this side (from the allocation, editable).
+// The side picks its competition right here (dansSource: Fetch from DanS + competition list), so the operator
+// doesn't have to go to the Competitions tab; choosing one does the same as its Show / A / B buttons.
 function dansBlock(k, slot) {
   const c = S.competitions.find((x) => x.id === slot.competitionId);
   const title = c
     ? h('div', { class: 'pnl-title' }, h('b', null, `${c.number} · ${c.title}`), h('div', { class: 'sub' }, c.round ? `${c.round.name} · ${c.round.state}` : 'No round yet'))
     : h('div', { class: 'pnl-title' }, h('span', { class: 'sub' }, S.competitions.length
-      ? (S.config.split ? `Nothing on side ${k}. Use the ${k} buttons in Competitions.` : 'Nothing on screen. Press Show in Competitions.')
-      : 'No DanS data. Use Own selection to pick judges from the gallery.'));
-  if (!c) return { title, parts: [] };
+      ? 'Choose the competition below.'
+      : 'No DanS data yet. Fetch it below, or use Own selection to pick judges from the gallery.'));
+  const source = dansSource(k, slot);
+  if (!c) return { title, parts: [source] };
   // DanS panel: tools, the order on screen (with arrows), then every judge of the event to add or remove
   const [tools, grid] = dansParts(c);
-  return { title, parts: [tools, sortChips(k), orderList(k), h('div', { class: 'own-pick-head' }, h('b', null, 'Judges of the event')), grid].filter(Boolean) };
+  return { title, parts: [source, tools, sortChips(k), orderList(k), h('div', { class: 'own-pick-head' }, h('b', null, 'Judges of the event')), grid].filter(Boolean) };
+}
+
+// Where a DanS side gets its panel: a fetch button (what it does depends on the data mode) and the list of the
+// event's competitions. The judge count in each entry shows which competitions already have a panel drawn.
+function dansSource(k, slot) {
+  let fetchPart;
+  if (S.fixture) fetchPart = h('span', { class: 'sub' }, 'Snapshot data');
+  else if (!S.config.eventId) fetchPart = h('span', { class: 'sub' }, 'Choose the DanS event in the top bar first.');
+  else if (S.mode === 'manual') {
+    // Manual mode promises never to contact DanS, so fetching here needs a deliberate switch first
+    fetchPart = [h('span', { class: 'sub' }, `Manual mode: offline copy${S.dataTime ? ` from ${stamp(S.dataTime)}` : ' (none yet)'}.`),
+      h('button', { title: 'Switch the data mode to On demand, then press Fetch from DanS', onclick: () => window.dp.setMode('ondemand').then(apply) }, 'Switch to On demand')];
+  } else if (S.mode === 'auto') fetchPart = h('span', { class: 'sub' }, 'Automatic mode: DanS is read every 2 seconds.');
+  else {
+    fetchPart = [h('button', {
+      class: 'primary', disabled: fetching ? '' : null,
+      title: 'Read competitions, judges and the judge allocation from DanS now (3 requests)',
+      onclick: (e) => fetchNow(e.currentTarget),
+    }, fetching ? 'Fetching…' : 'Fetch from DanS'),
+    h('span', { class: 'sub' }, S.status?.error ? `Fetch failed: ${S.status.error}` : S.dataTime ? `Data from ${stamp(S.dataTime)}` : 'Nothing fetched yet')];
+  }
+
+  // competitions of the event; the one on the other side is marked, picking it moves it to this side
+  const other = S.config.split ? S.config.slots[k === 'A' ? 'B' : 'A'].competitionId : null;
+  const pick = h('select', { class: 'comp-pick', disabled: S.competitions.length ? null : '' },
+    h('option', { value: '' }, S.competitions.length ? '– choose a competition –' : 'no competitions in the data'),
+    S.competitions.slice().sort((a, b) => a.number - b.number).map((c) => h('option', { value: c.id, selected: c.id === slot.competitionId },
+      `${c.number} · ${c.title}${c.round ? ` · ${c.round.name}` : ''} · ${c.judgeCount ? `${c.judgeCount} judges` : 'no panel yet'}${c.id === other ? ' (on side ' + (k === 'A' ? 'B' : 'A') + ')' : ''}`)));
+  pick.addEventListener('change', () => {
+    // assign() toggles: the same id again takes the competition off this side, which is what "–" means
+    const id = pick.value || slot.competitionId;
+    if (id) window.dp.assign(k, id).then(apply);
+  });
+  return h('div', { class: 'pnl-tools dans-source' }, fetchPart, h('span', { class: 'spacer' }), h('label', { class: 'comp-pick-l' }, h('b', null, 'Competition '), pick));
 }
 
 function dansParts(c) {
@@ -557,7 +594,10 @@ function renderStyle() {
   $('#style-for').textContent = S.event
     ? `Style of ${S.event.name}. Every event keeps its own. Changes appear on the projection after you push.`
     : 'Choose an event first; every event keeps its own style.';
-  for (const el of $$('[data-theme]')) if (document.activeElement !== el) el.value = t[el.dataset.theme];
+  for (const el of $$('[data-theme]')) {
+    if (el.type === 'checkbox') el.checked = t[el.dataset.theme] !== false; // on/off fields, e.g. the header card
+    else if (document.activeElement !== el) el.value = t[el.dataset.theme];
+  }
   $$('#bg-kind .chip').forEach((b) => b.classList.toggle('active', b.dataset.bg === t.background));
   $('#bg-image').hidden = t.background !== 'image';
   const thumb = $('#bg-thumb');
@@ -576,7 +616,8 @@ function renderStyle() {
 }
 // Colours are sent when the picker closes ("change"); sliders while dragging, so the preview follows.
 for (const el of $$('[data-theme]')) {
-  const send = () => window.dp.setTheme({ [el.dataset.theme]: el.type === 'range' || el.type === 'number' ? Number(el.value) : el.value }).then(apply);
+  const value = () => (el.type === 'checkbox' ? el.checked : el.type === 'range' || el.type === 'number' ? Number(el.value) : el.value);
+  const send = () => window.dp.setTheme({ [el.dataset.theme]: value() }).then(apply);
   el.addEventListener(el.type === 'range' ? 'input' : 'change', send);
 }
 $('#bg-kind').addEventListener('click', (e) => {
@@ -713,12 +754,20 @@ $$('.tab').forEach((t) => t.addEventListener('click', () => {
   }
 }));
 $('#modes').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) window.dp.setMode(b.dataset.mode).then(apply); });
-$('#fetch-now').addEventListener('click', async (e) => {
-  // Disabled while the read runs so a double click doesn't send two reads
-  fetching = true; e.target.disabled = true; e.target.textContent = 'Fetching…';
+// Fetch now (top bar) and Fetch from DanS (Judge selection) do the same read. Both are disabled while it runs
+// so a double click doesn't send two reads.
+async function fetchNow(btn) {
+  if (fetching) return;
+  fetching = true;
+  $('#fetch-now').disabled = true; $('#fetch-now').textContent = 'Fetching…';
+  if (btn) { btn.disabled = true; btn.textContent = 'Fetching…'; }
   try { apply(await window.dp.fetchNow()); }
-  finally { fetching = false; e.target.textContent = 'Fetch now'; if (S) renderBar(); }
-});
+  finally {
+    fetching = false; $('#fetch-now').textContent = 'Fetch now';
+    if (S) { renderBar(); renderPanels(); }
+  }
+}
+$('#fetch-now').addEventListener('click', () => fetchNow());
 $('#push').addEventListener('click', () => window.dp.push().then(apply));
 $('#proj-auto').addEventListener('change', (e) => window.dp.setProjectionAuto(e.target.checked).then(apply));
 $('#preview-page').addEventListener('change', () => {

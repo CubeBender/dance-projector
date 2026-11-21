@@ -78,7 +78,7 @@
 
   <!-- Judge selection per screen side: panel from DanS (editable) or own selection from the gallery -->
   <section id="tab-panel" class="pane" hidden>
-    <p class="hint">For each side choose <b>From DanS</b> (the panel of the competition shown, editable; <b>Use DanS panel</b> undoes your edits) or <b>Own selection</b> (judges from the gallery, no DanS needed). Nothing reaches the screen until you push.</p>
+    <p class="hint">For each side choose <b>From DanS</b> (fetch, pick the competition, and its drawn panel appears; editable, <b>Use DanS panel</b> undoes your edits) or <b>Own selection</b> (judges from the gallery, no DanS needed). Nothing reaches the screen until you push.</p>
     <div id="panels"></div>
   </section>
 
@@ -134,6 +134,10 @@
           <label class="stack">Darken image <input type="range" min="0" max="90" step="1" data-theme="imageDim"></label>
           <button id="bg-remove" class="ghost">Remove image</button>
         </div>
+        <h3>Header</h3>
+        <p class="hint">Card with the competition number, title and round at the top of the page.</p>
+        <label class="switch"><input type="checkbox" data-theme="headerJudges"> <span>On the judges page (above Porota)</span></label>
+        <label class="switch"><input type="checkbox" data-theme="headerCompetitors"> <span>On the competitors page (above Soutěžící)</span></label>
         <h3>Sponsor strip in OBS</h3>
         <label class="stack">Kept clear at the bottom (px, 0 = no strip)
           <input type="number" min="0" max="400" step="1" data-theme="strip">
@@ -315,7 +319,10 @@
     <h3>Read printout</h3>
     <div class="scan-grid">
       <div class="scan-left">
-        <select id="scan-device" title="Camera"></select>
+        <div class="scan-cam-row">
+          <select id="scan-device" title="Camera"></select>
+          <button id="scan-turn" title="Turn the picture a quarter turn – for a camera on its side. The app also finds the right way up by itself when reading and remembers it.">↻ Turn</button>
+        </div>
         <div class="cam-view scan-view"><video id="scan-video" autoplay playsinline muted></video><img id="scan-img" alt="" hidden></div>
         <div class="pnl-tools">
           <button id="scan-shoot" class="primary">Read</button>

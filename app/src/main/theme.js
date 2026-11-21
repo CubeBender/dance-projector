@@ -20,6 +20,11 @@ const DEFAULT_THEME = {
   background: 'lights',
   image: null,          // file name in <userData>/media, used when background === 'image'
   imageDim: 40,         // 0–90 %, darkens the image so text stays readable
+  // Header card (competition number, title, round) on the output pages, separately for the judges pages (above
+  // "Porota"; also heats) and the competitor page (above "Soutěžící"). Off when the OBS scene already says which
+  // competition it is.
+  headerJudges: true,
+  headerCompetitors: true,
 };
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -48,6 +53,11 @@ function cleanTheme(t = {}) {
   if (Number.isFinite(Number(t.imageDim)) && t.imageDim !== null && t.imageDim !== '') out.imageDim = pct(t.imageDim, 90);
   if (Number.isFinite(Number(t.strip)) && t.strip !== null && t.strip !== '') out.strip = pct(t.strip, 400);
   if (BACKGROUNDS.includes(t.background)) out.background = t.background;
+  for (const k of ['headerJudges', 'headerCompetitors']) {
+    if (typeof t[k] === 'boolean') out[k] = t[k];
+    // a style saved with the earlier single switch "header" (C-44) keeps its choice for both pages
+    else if (typeof t.header === 'boolean') out[k] = t.header;
+  }
   // image is a bare file name we created ourselves (no folders), or null to remove it
   if (t.image === null) out.image = null;
   else if (typeof t.image === 'string' && /^[\w.-]+$/.test(t.image)) out.image = t.image;

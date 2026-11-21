@@ -88,8 +88,14 @@
   //   --paper/--ink  number card fill and its digits (accent colour with readable ink)
   // With ?bg=1 it also paints the background (colour or image) so a page can be checked outside OBS.
   // The background type 'none' (transparent) changes nothing here: these pages are always transparent.
+  // Header card on/off (Style tab). Kept here because header() is called without the state. The competitor page
+  // has its own switch; every other page (judges, heats) follows the judges' one.
+  const HEADER_FIELD = /competitors\.html$/.test(location.pathname) ? 'headerCompetitors' : 'headerJudges';
+  let showHeader = true;
+
   function applyTheme(t) {
     if (!t) return;
+    showHeader = t[HEADER_FIELD] !== false;
     const root = document.documentElement.style;
     const text = t.text || '#F3F5F9', panel = t.panel || '#090B12';
     // the darker of panel / ground is the ink for light fills, so gold gets the event's near-black, not pure black
@@ -136,7 +142,7 @@
 
   // Re-render only when the visible content changes, so routine polls don't restart animations.
   function keyed(container, key, build) {
-    key = JSON.stringify([LANGS, key]);
+    key = JSON.stringify([LANGS, showHeader, key]); // switching the header card on/off must redraw too
     if (container.dataset.key === key) return false;
     container.dataset.key = key;
     container.replaceChildren(...[].concat(build()));
@@ -151,6 +157,7 @@
   }
 
   function header(slot, comp, { showDances = true } = {}) {
+    if (!showHeader) return []; // switched off in the Style tab: "Porota" / "Soutěžící" moves to the top
     const r = comp.round;
     const side = slot.label || slot.labelEn;
     // An own selection (made without DanS) may have no number, title or round: then show only what was typed,
