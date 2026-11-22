@@ -169,7 +169,8 @@ function renderSlots() {
     box.replaceChildren(
       h('button', { class: 'clear', onclick: () => window.dp.assign(k, c.id).then(apply) }, 'Clear'),
       h('div', { class: 't' }, `${c.number} · ${c.title}`),
-      h('div', { class: 'sub' }, r ? `${r.name} · ${r.state}${d ? ' · now ' + d.name : ''}${c.running ? ' · running' : ''}` : 'No round yet'));
+      h('div', { class: 'sub' }, r ? `${r.name} · ${r.state}${d ? ' · now ' + d.name : ''}${c.running ? ' · running' : ''}` : 'No round yet'),
+      heatLineFor(c.id)); // heat now / next (heats.js, D-29)
   }
 }
 
@@ -264,6 +265,7 @@ function openCrop(g, p) {
 // Files can be dropped on the big photo (added as the new main photo) or on the strip (extra photos).
 const judgeName = (g) => `${g.name || g.dansName} ${g.surname || g.dansSurname}`.trim() || `IDT ${g.fedId}`;
 let armedDelete = null; // "fedId/file" of the thumbnail waiting for the confirming second click
+let jsel = null;         // IDT of the selected judge card: Ctrl+V pastes a photo there (D-28)
 
 function dropZone(el, onFiles) {
   el.addEventListener('dragover', (e) => { e.preventDefault(); el.classList.add('drag'); });
@@ -310,7 +312,7 @@ function judgeCard(g) {
   const strip = h('div', { class: 'strip' }, thumbs, add);
   dropZone(strip, (files) => window.dp.judgePhotosAdd(g.fedId, files).then(apply));
 
-  return h('div', { class: 'judge' + (g.inSlots ? ' on' : '') },
+  const card = h('div', { class: 'judge' + (g.inSlots ? ' on' : '') + (jsel === g.fedId ? ' sel' : ''), 'data-k': g.fedId, title: 'Click the card to select it for Ctrl+V' },
     ph,
     h('div', { class: 'jinfo' },
       h('div', { class: 'jtop' },
@@ -329,7 +331,31 @@ function judgeCard(g) {
       strip,
       g.inGallery ? h('div', { class: 'jactions end' },
         h('button', { class: 'ghost danger', onclick: () => confirmDeleteJudge(g) }, 'Delete judge…')) : null));
+  // clicking a card (not a button, field or photo in it) selects it as the target of Ctrl+V, as on the Competitors tab
+  card.addEventListener('click', (e) => {
+    if (e.target.closest('button, input, select, .ph')) return;
+    jsel = jsel === g.fedId ? null : g.fedId;
+    $$('.judge', $('#judges')).forEach((x) => x.classList.toggle('sel', x.dataset.k === jsel));
+  });
+  return card;
 }
+
+// ---- Ctrl+V on the Judges tab (D-28): an image from the clipboard becomes the selected judge's main photo ----
+// Not while typing in a field (there Ctrl+V pastes text as usual) and not with a dialog open.
+document.addEventListener('paste', async (e) => {
+  if ($('#tab-judges').hidden || document.querySelector('dialog[open]')) return;
+  if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
+  const item = [...(e.clipboardData?.items || [])].find((x) => x.kind === 'file' && x.type.startsWith('image/'));
+  if (!item) { toast('The clipboard holds no image. In WhatsApp Desktop right-click the photo and choose Copy.', 'err'); return; }
+  e.preventDefault();
+  // judges have no start number to type, so the photo needs a selected card
+  const g = jsel && S.gallery.find((x) => x.fedId === jsel);
+  if (!g) { toast('Click a judge card first, then press Ctrl+V again.', 'err'); return; }
+  toast(`Adding the photo to ${judgeName(g)}…`);
+  const st = await window.dp.judgePhotoBytes(g.fedId, new Uint8Array(await item.getAsFile().arrayBuffer()));
+  apply(st);
+  if (st?.error) toast(st.error, 'err'); else toast(`Photo added to ${judgeName(g)}. Click it to adjust the framing.`);
+});
 
 // Asks before deleting a judge from the gallery, and says exactly what goes with them.
 let deletingJudge = null;
@@ -390,7 +416,7 @@ function renderSettings() {
   if (document.activeElement !== $('#running-states')) $('#running-states').value = S.config.runningStates.join(', ');
 }
 
-// ---- Judge selection tab ----
+// ---- Judges tab, top part: judge selection per side ----
 // One block per screen side (A, and B when the floor is split). Each side shows one of two sources:
 //   From DanS     – the panel of a DanS competition, chosen here or in Competitions (DanS allocation, editable)
 //   Own selection – judges picked from the gallery with letters set here; needs no DanS data at all (D-19)
@@ -516,7 +542,7 @@ function manualBlock(k) {
       rows.length ? h('div', { class: 'own-rows' }, rows) : h('p', { class: 'hint' }, 'Click judges below to add them. Letters are given A, B, C… and can be changed.'),
       gallery.length
         ? [h('div', { class: 'own-pick-head' }, h('b', null, 'Gallery'), search), h('div', { class: 'pick' }, buttons)]
-        : h('p', { class: 'empty' }, 'The gallery is empty. Add judges in the Judges tab (Import folder… or New judge…).'),
+        : h('p', { class: 'empty' }, 'The gallery is empty. Add judges below (Import folder… or New judge…).'),
     ].flat(),
   };
 }
@@ -695,6 +721,8 @@ function apply(state) {
   renderBar(); renderComps(); renderSlots(); renderOutputs(); renderJudges(); renderSettings();
   renderPanels(); renderStyle(); renderProjection();
   renderCompetitors(); renderCompProjection(); // competitors.js
+  renderResults();                               // results.js
+  renderHeats();                                 // heats.js
 }
 
 // events
@@ -761,18 +789,20 @@ $('#running-states').addEventListener('change', (e) => window.dp.setOption({ run
 $$('.tab').forEach((t) => t.addEventListener('click', () => {
   $$('.tab').forEach((x) => x.classList.toggle('active', x === t));
   for (const x of $$('.tab')) $('#tab-' + x.dataset.tab).hidden = x !== t;
-  // the previews follow: competitor page on the Competitors tab, the judge page when leaving it
-  const compPage = S?.outputs?.pages.find((p) => p.port);
-  const onComp = t.dataset.tab === 'competitors';
-  if (compPage && onComp !== !!previewPort) {
-    previewPath = onComp ? compPage.path : '/out/judges.html?slot=A';
-    previewPort = onComp ? compPage.port : null;
+  // the previews follow the tab: competitor page on Competitors, results page on Results (both on the competitor
+  // port), the judge page elsewhere
+  const pageFor = { competitors: '/out/competitors.html', results: '/out/results.html' }[t.dataset.tab];
+  const page = pageFor && S?.outputs?.pages.find((p) => p.port && p.path === pageFor);
+  const wantPath = page ? page.path : '/out/judges.html?slot=A', wantPort = page ? page.port : null;
+  // leaving for a tab without its own page (Judges, Style…) switches back only from a competitor-port page
+  if ((page || previewPort) && (wantPath !== previewPath || wantPort !== previewPort)) {
+    previewPath = wantPath; previewPort = wantPort;
     $('#preview-page').value = `${previewPort || ''}|${previewPath}`;
     renderPreviews(true);
   }
 }));
 $('#modes').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) window.dp.setMode(b.dataset.mode).then(apply); });
-// Fetch now (top bar) and Fetch from DanS (Judge selection) do the same read. Both are disabled while it runs
+// Fetch now (top bar) and Fetch from DanS (Judges tab) do the same read. Both are disabled while it runs
 // so a double click doesn't send two reads.
 async function fetchNow(btn) {
   if (fetching) return;
@@ -794,7 +824,27 @@ $('#preview-page').addEventListener('change', () => {
   renderPreviews(true);
 });
 
-window.dp.onState(apply);
+// States pushed by the main process (every DanS read: every 2 s in automatic mode) rebuild the window, and rebuilding
+// a dropdown closes it while the operator is choosing (C-56). So while a dropdown has focus the newest pushed state
+// waits: it is applied as soon as the dropdown loses focus, or after 20 s at the latest. Choosing an option takes the
+// focus away at once, so the window never stays behind after a choice (the choice's own answer redraws it anyway).
+// The status line keeps updating meanwhile (onStatus below). States answering the operator's own actions are applied
+// straight away as before; only these pushed ones wait.
+let heldState = null, heldTimer = null;
+function flushHeldState() {
+  clearTimeout(heldTimer); heldTimer = null;
+  const st = heldState; heldState = null;
+  if (st) apply(st);
+}
+window.dp.onState((st) => {
+  if (document.activeElement?.tagName !== 'SELECT') { apply(st); return; }
+  heldState = st;
+  if (!heldTimer) heldTimer = setTimeout(flushHeldState, 20000);
+});
+document.addEventListener('focusout', (e) => { if (e.target.tagName === 'SELECT') setTimeout(flushHeldState, 0); });
+// After a choice: leave the dropdown, so the held state is applied (on the next tick, after the dropdown's own change
+// handler has read its value) and later pushes are no longer held. Capture phase, so it runs for every dropdown.
+document.addEventListener('change', (e) => { if (e.target.tagName === 'SELECT') e.target.blur(); }, true);
 window.dp.onStatus((st) => { if (S) { S.status = st; renderStatus(); } });
 setInterval(() => S && renderStatus(), 1000);
 window.dp.state().then(apply);

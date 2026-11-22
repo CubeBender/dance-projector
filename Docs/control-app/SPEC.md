@@ -1,6 +1,6 @@
 # Control app – specification
 
-Electron desktop app for the operator. Top bar, four tabs (Competitions, Judge panel, Judges, Style) and a side panel (Projection, Floor, Output pages, On-screen text, Settings).
+Electron desktop app for the operator. Top bar, six tabs (Competitions, Judges, Competitors, Heats, Results, Style; Judges holds the judge selection on top and the gallery below since D-28) and a side panel (Projection, Floor, Output pages, On-screen text, Settings).
 
 ## 1. Connection bar
 - DanS server address (default `http://localhost:8686`), event dropdown, connection status dot with last update time.
@@ -36,7 +36,7 @@ Electron desktop app for the operator. Top bar, four tabs (Competitions, Judge p
 - Photos are re-encoded (baseline JPEG, max 900 px) into `<userData>/photos/`; the gallery is `<userData>/judges.json` (shape in `app/src/main/gallery.js`; older single-photo entries are converted on load). Deleted photos stay on disk until the next push or start, so the screen never loses an image it still shows.
 - On screen: gallery names win over DanS; Name on screen wins over both; the main photo with its crop.
 
-## 4b. Judge selection (D-13, D-14, D-19)
+## 4b. Judge selection (D-13, D-14, D-19) – top part of the Judges tab since D-28
 - One block per screen side (A, and B on a split floor) with a source switch: **From DanS** or **Own selection**.
 - **Own selection** (no DanS needed): optional No., competition title in both languages and round; the chosen judges as rows with an editable letter (A, B, C… given in order of clicking, gaps filled; A–Z/0–9, max 3; a letter used twice is pointed out) and ×; the gallery below as toggle buttons with a search box. Stored in `config.json` (`slots.X.source`, `manualPanels.X`). Pressing **Show** on a DanS competition switches the side back to From DanS.
 - **From DanS:**
@@ -67,3 +67,13 @@ Electron desktop app for the operator. Top bar, four tabs (Competitions, Judge p
 ## Persistence
 - `<userData>/config.json`: server, saved servers, event, data mode, projection mode, styles, slots, sides, poll interval, running-state mapping.
 - `<userData>/panels.json`, `cache/`, `media/`, `pushed.json`: see the sections above.
+
+## Judges tab merged, Ctrl+V (2026-11-22, D-28, C-52)
+- The Judge selection tab is gone: its blocks (section 4b) sit at the top of the **Judges** tab, the gallery (section 4) below under "Judge gallery".
+- Click a judge card to select it; **Ctrl+V** adds the copied image as that judge's main photo. Without a selected card the app asks to select one.
+
+## Results tab (2026-11-22, D-26)
+- See [Docs/results/SPEC.md](../results/SPEC.md). The previews switch to the results page on this tab, like they do for the competitor page.
+
+## Heats tab (2026-11-22, D-29)
+- See [Docs/heats/SPEC.md](../heats/SPEC.md). The floor boxes in the side panel show the heat now and next under a running competition ("R heat 1/2 · next heat 2").

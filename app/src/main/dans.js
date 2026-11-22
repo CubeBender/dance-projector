@@ -10,6 +10,9 @@ const ALLOWED = [
   /^\/competitions$/,
   new RegExp(`^/events/${UUID}/(judges|officials|officials/competitions|startlist)(\\?order=[%+\\w]+)?$`),
   new RegExp(`^/rounds/${UUID}/draw/competitors$`),
+  // judges' marks of one round (heat tracking, D-29): read to see which heat the judges are marking now. Marks are
+  // confidential until the results are out, so the app never puts them on screen (heattrack.js).
+  new RegExp(`^/rounds/${UUID}/marks$`),
   /^\/index_(age|class|discipline|dance|official_role|series)$/,
 ];
 
@@ -58,6 +61,9 @@ class DansClient {
   allocation(e) { return this.list(`/events/${e}/officials/competitions`, e); }
   startlist(e) { return this.list(`/events/${e}/startlist`, e); }
   async draw(e, roundId) { return (await this.get(`/rounds/${roundId}/draw/competitors`, e)).entity; }
+  // every mark of the round in one answer (DanS ignores paging here): [{ target: { Competitor: { round_dance_id,
+  // judge, competitor_id } }, value: { Cross: true } | …, suppressed, overridden }]
+  marks(e, roundId) { return this.list(`/rounds/${roundId}/marks`, e); }
 
   async judges(e) {
     // Drop tablet PINs immediately; they must never be stored or shown.

@@ -48,3 +48,9 @@ All images are re-encoded by Chromium (EXIF orientation applied, max 900 px wide
 ## Out of scope
 - Reading WhatsApp automatically (against WhatsApp's terms, D-22).
 - Two floor halves for competitors (one competitor screen).
+
+## Club and sponsor (2026-11-22, D-27, C-51)
+- Read from the DanS start list (`club`, `sponsor`); a competitor card has **Club** and **Sponsor** fields with the DanS values as placeholders. A typed value wins; emptying the field goes back to DanS.
+- The competitor page shows the club (accent colour) and the sponsor (quieter) under the name, in the round grid and in spotlight. A long club shrinks to fit before it is cut.
+- The results page (D-26) shows both too.
+

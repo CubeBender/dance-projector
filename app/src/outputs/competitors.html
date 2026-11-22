@@ -8,7 +8,8 @@
      which has its own pushed state: /api/state there is { theme, language, event, screen }, where
        screen.header       { number, title, titleEn, round } or null
        screen.mode         'round' (every competitor of the round) | 'spotlight' (one competitor large)
-       screen.competitors  [{ number, kind: 'solo'|'couple', first, last, surnames, photo, crop }] sorted by number
+       screen.competitors  [{ number, kind: 'solo'|'couple', first, last, surnames, club, sponsor, photo, crop }] sorted by number
+                           club and sponsor are empty when there is none (D-27)
        screen.spotlight    one of those, or null -->
 <style>
   .panel-title { margin: 22px 0 0 6px; color: var(--accent); font-size: 32px; display: flex; align-items: baseline; }
@@ -29,6 +30,11 @@
   .last { color: var(--text); font-family: var(--display); font-variation-settings: "wght" 600, "wdth" 82; font-size: calc(var(--lw) * 0.145 * var(--fs, 1)); line-height: 1.08; margin-top: 0.04em; padding-top: 0.06em; overflow: hidden; white-space: nowrap; }
   /* couples: one surname per line; the second line follows straight on */
   .last + .last { margin-top: 0; padding-top: 0; }
+  /* club and sponsor (D-27): one quiet line under the name, sized with the name text, cut with … when too long */
+  .club { font-size: calc(var(--lw) * 0.075 * var(--fs, 1)); color: var(--accent); margin-top: 0.35em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sponsor { font-size: calc(var(--lw) * 0.065 * var(--fs, 1)); color: var(--muted); margin-top: 0.15em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .spot .club { font-size: 40px; margin-top: 18px; white-space: normal; }
+  .spot .sponsor { font-size: 30px; margin-top: 6px; white-space: normal; }
 
   /* ---- spotlight: one competitor, photo left, number and name right ---- */
   .spot { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; gap: 72px; margin-top: 28px; }
@@ -56,9 +62,12 @@ const initials = (c) => (c.surnames || []).map((s) => s[0]).join('') || String(c
 
 // Name lines of one competitor. Solo: small first name, large surname. Couple: only the surnames, one per line
 // (a dash between them would wrap to the start of a line on narrow cards).
+// Below the name: the club, and the sponsor when the competitor has one (D-27).
 function nameBlock(c) {
   const lines = c.kind === 'couple' && c.surnames.length > 1 ? c.surnames : [c.last];
-  return [c.first ? h('div', { class: 'first' }, c.first) : null, ...lines.map((s) => h('div', { class: 'last' }, s))];
+  return [c.first ? h('div', { class: 'first' }, c.first) : null, ...lines.map((s) => h('div', { class: 'last' }, s)),
+    c.club ? h('div', { class: 'club' }, c.club) : null,
+    c.sponsor ? h('div', { class: 'sponsor' }, c.sponsor) : null];
 }
 
 function photoBox(c) {
@@ -66,7 +75,8 @@ function photoBox(c) {
 }
 
 // ---- card fitting, the same method as the judge page (judges.html fit) ----
-const LABEL = 0.62;   // name block under the photo, in card widths
+// name block under the photo, in card widths; a club / sponsor line makes it taller (set per page in render)
+let LABEL = 0.62;
 const T_MAX = 1.35;   // name text may grow this much with spare height
 const W_MAX = 440;
 function fit(grid, n, phMin) {
@@ -119,6 +129,12 @@ function shrinkToFit(root) {
     const n = need(e);
     if (n < 1) e.style.setProperty('--fs', Math.max(0.4, common * n * 0.98).toFixed(3));
   }
+  // club and sponsor lines (D-27): each on its own, down to 60 % of the common size; beyond that the … stays
+  for (const e of root.querySelectorAll('.club, .sponsor')) {
+    e.style.removeProperty('--fs');
+    const n = need(e);
+    if (n < 1) e.style.setProperty('--fs', Math.max(0.6 * common, common * n * 0.98).toFixed(3));
+  }
 }
 
 // header() from common.js expects a slot and a competition; the competitor screen has one header, no floor sides
@@ -144,6 +160,8 @@ function render(state) {
           h('div', { class: 'spot-text' }, h('div', { class: 'card' }, c.number), h('div', { class: 'plate' }, nameBlock(c))))];
     }
     if (!list.length) return debug ? [h('div', { class: 'empty-hint' }, 'No competitors in the round yet')] : [];
+    // room for the club and sponsor lines under the names when any card has them, so photos shrink to make space
+    LABEL = 0.62 + (list.some((c) => c.club) ? 0.1 : 0) + (list.some((c) => c.sponsor) ? 0.085 : 0);
     return [...headerOf(scr.header),
       h('div', { class: 'panel-title caps enter', '--i': 1 }, bi(TITLE, 'inline'), h('span', { class: 'count' }, `· ${list.length}`)),
       h('div', { class: 'grid', 'data-ph': photoRatio(list) },

@@ -43,6 +43,9 @@ class Poller extends EventEmitter {
     this.raw = null;
     this.lastSlow = 0;
     this.wantedRounds = () => [];
+    // Rounds being danced now (heat tracking, D-29). Automatic mode reads their judges' marks on every poll, and
+    // their draw (who dances in which heat) once per round. Set by main.js.
+    this.liveRounds = () => [];
     this.timer = null;
     this.status = { connected: false, error: null, lastOk: null };
   }
@@ -99,6 +102,27 @@ class Poller extends EventEmitter {
     } finally { this.emit('status', this.status); }
   }
 
+  // Results of a finished competition (Results tab, decision D-26): the start list (names, clubs, sponsors) and the
+  // draw of the FINAL round, which carries each finalist's place (ranking / ranking_to). 2 GET requests, the same
+  // read-only ones as fetchRoundCompetitors. Kept in raw.results, not raw.draws: automatic mode rebuilds raw.draws on
+  // every poll from the rounds on screen, which would drop a final read here. Lands in the offline copy too.
+  async fetchResults(roundId) {
+    if (!this.event) throw new Error('Choose an event first');
+    if (!this.raw) throw new Error('Fetch the event data first');
+    const e = eventIdOf(this.event);
+    try {
+      const [startlist, draw] = await Promise.all([this.dans.startlist(e), this.dans.draw(e, roundId)]);
+      this.raw.startlist = startlist;
+      this.raw.results = { ...(this.raw.results || {}), [roundId]: draw };
+      this.status = { connected: true, error: null, lastOk: Date.now() };
+      this.emit('raw', this.raw);
+      return draw;
+    } catch (err) {
+      this.status = { ...this.status, connected: false, error: String(err.message || err) };
+      throw err;
+    } finally { this.emit('status', this.status); }
+  }
+
   // Start list only (Competitors tab, "Refresh start list"): 1 GET request. Fetch now reads the start list only on
   // the first read, but start numbers arrive later, when competition staff give them in DanS (D-23).
   async fetchStartlist() {
@@ -146,17 +170,32 @@ class Poller extends EventEmitter {
     if (!this.event) return;
     const e = eventIdOf(this.event);
     const now = Date.now();
+    // Draws read before (Load from DanS round, heat tracking) stay: a full read starts with no draws, and losing them
+    // would make the competitor list and the heats forget who dances in a round until it is read again.
+    const oldDraws = this.raw?.draws || {};
     if (!this.raw || now - this.lastSlow > this.slowEveryMs) {
+      const results = this.raw?.results; // read only on request (Results tab): a full read must not lose them
       this.raw = await fetchRaw(this.dans, this.event);
+      if (results) this.raw.results = results;
       this.lastSlow = now;
     } else {
       this.raw.competitions = await this.dans.competitions(e);
     }
-    const draws = {};
+    const draws = { ...oldDraws };
     for (const rid of new Set(this.wantedRounds(this.raw))) {
-      try { draws[rid] = await this.dans.draw(e, rid); } catch { if (this.raw.draws?.[rid]) draws[rid] = this.raw.draws[rid]; }
+      try { draws[rid] = await this.dans.draw(e, rid); } catch { /* keep the one read before, if any */ }
+    }
+    // Heat tracking (D-29): for each round being danced, its draw once (the heats don't change during a round) and
+    // its marks on every poll (1 GET per round). A round that fails to read is skipped this time.
+    const live = {};
+    for (const rid of new Set(this.liveRounds(this.raw))) {
+      try {
+        if (!draws[rid]) draws[rid] = await this.dans.draw(e, rid);
+        live[rid] = { marks: await this.dans.marks(e, rid), at: now };
+      } catch { /* not this time; the tracker keeps its last position */ }
     }
     this.raw.draws = draws;
+    this.raw.live = live;
     this.raw.fetchedAt = now;
     this.emit('raw', this.raw);
   }
@@ -164,13 +203,15 @@ class Poller extends EventEmitter {
 
 // Plays back a fixture file instead of talking to DanS.
 class FixturePoller extends EventEmitter {
-  constructor(raw) { super(); this.raw = raw; this.event = raw.event; this.status = { connected: true, error: null, lastOk: Date.now(), fixture: true }; this.wantedRounds = () => []; }
+  constructor(raw) { super(); this.raw = raw; this.event = raw.event; this.status = { connected: true, error: null, lastOk: Date.now(), fixture: true }; this.wantedRounds = () => []; this.liveRounds = () => []; }
   setClient() {}
   setEvent() { this.kick(); }
   seed() {}
   async fetchOnce() { this.kick(); }
   // the fixture holds draws of a few rounds only; others come back empty
   async fetchRoundCompetitors(roundId) { return this.raw.draws?.[roundId] || { competitors: [] }; }
+  // a finished final in a snapshot: its draw is under results (or draws, for older snapshots)
+  async fetchResults(roundId) { return this.raw.results?.[roundId] || this.raw.draws?.[roundId] || { competitors: [] }; }
   async fetchStartlist() { this.kick(); }
   start() { this.kick(); this.timer = setInterval(() => this.kick(), 5000); }
   stop() { clearInterval(this.timer); }

@@ -103,6 +103,24 @@ Claude's decision log. Questions that need the user are asked in the conversatio
 - **Asked by the user:** try showing the judges straight from DanS: in Judge selection, choose From DanS, fetch, pick the competition, and its judge panel is selected. The Saturday event (CS1747) has two competitions with a panel drawn.
 - **Decision:** see C-43. Changes D-24 for today only in that DanS is reachable over the venue network after all; printouts stay the fallback.
 
+### D-26 Results announcement tab (2026-11-22)
+- **Asked by the user:** a new tab to announce the winners: either the top 3 places (ties possible, very rare) or all finalists; show the competitors from the last to the first with their final place, and reveal the final ladder as the finalists are revealed. Available once the competition is finished.
+- **Decision:** Results tab + `/out/results.html` on the competitor port. Places from the final round's draw in DanS (`ranking`, `ranking_to`). Details and Claude's choices: C-49, C-50, [Docs/results](Docs/results/SPEC.md).
+
+### D-27 Club and sponsor of competitors (2026-11-22)
+- **Asked by the user:** add the competitor's club and sponsor (if there is one).
+- **Decision:** both read from the DanS start list (club on every entry, sponsor on 7 of 283 at the MČR), editable on the competitor card, and shown on the competitor and results pages. Changes C-31's rule that clubs never reach the output page. See C-51.
+
+### D-28 Judges and Judge selection merged; Ctrl+V for judge photos (2026-11-22)
+- **Asked by the user:** merge Judges and Judge selection the way the Competitors tab is built, and let judges take photos with Ctrl+V like competitors.
+- **Decision:** one **Judges** tab: the selection per side on top, the gallery below. Ctrl+V pastes onto the selected judge card. See C-52.
+
+### D-29 Which heat is on the floor and which is next (2026-11-22)
+- **Asked by the user:** heats are shown from a DanS display run by a colleague, and the user is sometimes unsure which heat goes next. Is there an accurate way to know which heat is dancing?
+- **Answer (Claude, after reading the venue DanS):** DanS has no "current heat". It knows when a dance is finished, and it has the judges' marks (`/rounds/{r}/marks`, no timestamps). Suggested: a Next heat button with the order worked out by the app, plus following the judges' crosses if they arrive live, and a recorder to check that at an event.
+- **User:** "lets do it as suggested. I believe the crosses are live. But sometimes a judge can lagg behind or accidentally give a cross to somebody who is not dansing right now by selecting a wrong number. So there needs to be some margin of error to the current/ next heat logic."
+- **Decision:** new **Heats** tab and a line in the side-panel floor boxes. Following the marks with a quorum and forward-only movement, plus Next heat / Back by hand, and a heat log. See C-53 to C-55, [Docs/heats](Docs/heats/SPEC.md).
+
 ## Claude's decisions
 
 ### C-01 Technology: Electron with plain JavaScript, no framework or build step
@@ -313,3 +331,43 @@ Claude's decision log. Questions that need the user are asked in the conversatio
 - **Asked by the user:** sort the Competitions screen by check-in end, because the competition numbers are not always in the day's order.
 - **Decision (Claude):** two chips, Sort by *Number* (the old order, default) and *Check-in end* (earliest first). Running competitions stay on top in both, as before. Competitions without a check-in end go last; ties fall back to the number. The choice is kept in the window's localStorage (a per-window convenience, not app settings).
 - **Checked:** the sort on the sample event gives check-in order 08:15, 08:20, 08:25…; a competition without a time ends last. `npm test` passes.
+
+### C-49 Results come from the final's draw, are kept apart and revealed by place group (2026-11-22, D-26)
+- **Decision (Claude):** the places are read from `GET /rounds/{final}/draw/competitors` (already allowed, read-only) together with the start list: 2 requests per **Load results**, enabled only once the final is Finished. Kept in `raw.results`, not `raw.draws`, because automatic mode rebuilds `raw.draws` every poll; the poller also carries `results` across its full re-reads. Saved in the offline copy, so Manual mode can announce a final read earlier.
+- **Ties (Claude):** competitors with the same place form one group, labelled "2.–3." (from `ranking_to`, or from the count when DanS leaves it empty) and revealed in one step. Top 3 keeps every group starting at place 3 or better, so a tie on 3rd shows all of them.
+- **Checked:** against the venue DanS: CS1747 competition 1 gave places 1–6 (`ranking_to` null) and the window/page matched; a made-up tie on 2nd in a test copy (Manual mode, offline copy) revealed "2.–3." with both competitors. `npm test` (new `test-results.js`) passes.
+
+### C-50 Reveal goes on screen at once; setup waits for the push (2026-11-22, D-26)
+- **Decision (Claude):** the results page lives on the competitor port (it needs the competitor photos) as part of the competitor projection state. The announcer is talking while the operator clicks, so **Reveal / Back / Hide all** push straight away – but only the `results` part (`Projection.pushKeys`), so competitor-screen edits being prepared stay off air. Choosing a competition, loading, or switching Top 3 / Whole final is prepared like everything else and starts from "nothing revealed".
+- **Also (Claude):** Page Down / → and Page Up / ← on the Results tab, so a presentation clicker can drive it.
+
+### C-51 Club and sponsor: DanS values, typed values win while not empty (2026-11-22, D-27, changes C-31)
+- **Decision (Claude):** `fromStartlist` reads `club` and `sponsor`; a typed value wins, an emptied field falls back to DanS (shown as the placeholder). The competitor cards on screen get a club line and, when there is one, a sponsor line; the grid leaves room for them and a long club shrinks to fit before it is cut. On the results page the sponsor label is written once in both languages ("Sponzor / Sponsor: …").
+- **Checked:** the six CS1747 finalists on the competitor page (all clubs readable) and the winner's sponsor on the results page; tests updated (the old "no club on the output page" assert now expects the club).
+
+### C-52 Judges tab layout and Ctrl+V (2026-11-22, D-28)
+- **Decision (Claude):** the selection blocks move unchanged to the top of the Judges tab, then a "Judge gallery" heading with the gallery tools and cards. Clicking a card (not its photo, buttons or fields) selects it; Ctrl+V adds the clipboard image as that judge's main photo (`judge-photo-bytes`, same re-encoding as imports). With no card selected, a judge has no number to type, so the app asks to select one instead of opening a dialog.
+- **Checked:** in a test copy: a simulated paste of a JPEG onto a selected judge went from 2 to 3 photos with the new one as main.
+
+### C-53 Heat tracking: quorum of judges, forward only, the operator has the last word (2026-11-22, D-29)
+- **Decision (Claude):** a heat counts as being danced once **a third of the round's judges, at least 2** (9 → 3, 7 → 3, 5 → 2), have crossed somebody in it. The latest such heat, in dance order, is the position. One wrong number is one judge, below the quorum. A judge lagging a heat behind doesn't hold the others back, because only the latest heat with a quorum counts.
+- **Forward only (Claude):** what the data has proved is never taken back: crosses removed later, or a stray, can't pull the position back.
+- **More evidence (Claude), each "at least here":** a dance DanS has finished (`completed_at`) → heat 1 of the next dance. A quorum of judges who have **submitted** a dance (marks with target `DanceCompletion`, found in the venue data) → the dance is over, because a judge can only submit after its last heat. A quorum of judges' tablets on a dance (`round_dance`) → heat 1 of that dance. The tablet field is unverified live, and is recorded in the heat log.
+- **Operator (Claude):** **Next heat / Back** set the position by hand and hold until the evidence moves past what it was at that moment. This way a Back is not undone by the same marks it corrects, and a Next pressed when the music starts holds until the marks catch up. **Follow the judges' marks** can be switched off per round.
+- **Why a third:** with 9 judges, 3 is reached seconds into a heat (in the replay below, 3 to 4 s after the first crosses), but 3 judges crossing the same wrong heat at once is unlikely. The heat log will show whether it should be tuned.
+- **Checked:** `test-heats.js` (stray, lagging judge, crosses taken back, Back / Next, submissions, finished dances, tablets, auto off). A simulator passed the venue DanS through read-only and replayed yesterday's CS1747 competition 1 semifinal live: judges one by one, judge M a heat late, judge C crossing a heat-2 number during heat 1. The app went Sa 1 → Sa 2 (at 3 of 9 judges) → C 1 (Sa submitted) → C 2 → R 1. Neither the stray nor the lagging judge moved it, and Next heat showed "Set by you" until the marks caught up.
+
+### C-54 Marks are read only in automatic mode; draws are kept (2026-11-22, D-29)
+- **Decision (Claude):** automatic mode reads `/rounds/{r}/marks` of each running round every poll (1 GET per round every 2 s, added to the read-only allow-list) and its draw once per round. On demand and Manual don't read marks. There, finished dances (at the last read) and Next heat / Back move the position. Marks older than 30 s don't count.
+- **Also fixed (Claude):** the poller dropped every draw on each poll (automatic mode rebuilt `raw.draws` from an always-empty list), so a round read with Load from DanS round was lost within 2 s. Draws now stay across polls and full reads.
+- **Confidential:** marks are never shown on screen and never named per judge in the window. The tab shows only how many judges have crossed in a heat ("3/9", "crossing now: 2").
+
+### C-55 Heat log (2026-11-22, D-29)
+- **Decision (Claude):** in automatic mode, every poll in which something changed in a running round adds a line to `heatlog/<date>.jsonl` in the app's data folder. A line lists the crosses added or taken back with judge letter, dance, heat and number, the submissions, the judges' tablets, and where the app put the round and why. `node scripts/heatlog.js <file> [competition]` prints it as a timeline. It holds real numbers, so it stays out of the repository.
+- **Why:** the user believes the crosses are live. The log shows it at the next event, along with how fast a heat reaches the quorum, and what the tablet field does.
+
+### C-56 Dropdowns no longer close by themselves (2026-11-22)
+- **Reported by the user:** an opened competition dropdown keeps closing itself after a moment.
+- **Cause:** every DanS read (every 2 s in automatic mode) pushes a new state to the window, which rebuilds its sections, including the dropdowns (competition pickers in Judges, Competitors and Results, the event list, the server list).
+- **Decision (Claude):** while a dropdown has focus, pushed states wait (the newest one is kept), and are applied when the dropdown loses focus, or after 20 s at the latest. Choosing an option takes the focus away at once, so the window catches up straight after a choice. The status line keeps updating, and answers to the operator's own actions are applied at once as before.
+- **Checked:** in a test copy in automatic mode against the venue DanS, a focused dropdown stayed the same element for 7 s while new states arrived, and after leaving it the window showed the newest data at once.

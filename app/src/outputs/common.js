@@ -88,9 +88,9 @@
   //   --paper/--ink  number card fill and its digits (accent colour with readable ink)
   // With ?bg=1 it also paints the background (colour or image) so a page can be checked outside OBS.
   // The background type 'none' (transparent) changes nothing here: these pages are always transparent.
-  // Header card on/off (Style tab). Kept here because header() is called without the state. The competitor page
-  // has its own switch; every other page (judges, heats) follows the judges' one.
-  const HEADER_FIELD = /competitors\.html$/.test(location.pathname) ? 'headerCompetitors' : 'headerJudges';
+  // Header card on/off (Style tab). Kept here because header() is called without the state. The competitor and
+  // results pages (both on the competitor port) have their own switch; every other page follows the judges' one.
+  const HEADER_FIELD = /(competitors|results)\.html$/.test(location.pathname) ? 'headerCompetitors' : 'headerJudges';
   let showHeader = true;
 
   function applyTheme(t) {

@@ -49,11 +49,19 @@
 - 2026-11-21 **Follow running fix** (C-46): a hand-picked competition is no longer replaced by an already running one.
 - 2026-11-21 **Panels per round** (C-47): a hand edit or Clear no longer hides the DanS panel of the next round.
 - 2026-11-22 **Sorting in Competitions** (C-48): Sort by Number / Check-in end, remembered. Logic checked on the sample event; `npm test` passes. Not yet looked at in the app window.
+- 2026-11-22 **Results announcement** (D-26, C-49, C-50): Results tab, Top 3 / whole final, reveal from the last place with the ladder filling in, ties revealed together, clicker keys; page `/out/results.html` on the competitor port. Checked against the venue DanS (CS1747 competition 1) and a made-up tie in a test copy. [Docs/results](Docs/results/PLAN.md)
+- 2026-11-22 **Club and sponsor** (D-27, C-51): from the DanS start list, editable on the competitor card, on the competitor and results pages.
+- 2026-11-22 **Judges tab merged** (D-28, C-52): selection on top, gallery below; Ctrl+V pastes a photo onto the selected judge.
+- 2026-11-22 **Heat now / next** (D-29, C-53 to C-55): Heats tab and a floor-box line; follows the judges' crosses (quorum of a third, forward only), finished and submitted dances, Next heat / Back; heat log + `scripts/heatlog.js`. Checked with tests and a live replay of yesterday's semifinal through a read-only simulator. Not yet seen on a real running round. [Docs/heats](Docs/heats/PLAN.md)
+- 2026-11-22 Poller keeps draws across polls (C-54): a round loaded with Load from DanS round no longer disappears in automatic mode.
+- 2026-11-22 Dropdowns no longer close by themselves in automatic mode (C-56): pushed updates wait while a dropdown is open.
 
 ## In progress
 - Nothing running.
 
 ## Next
+- At the next event, in **Automatic** mode: watch the Heats tab during a few rounds, then run `node scripts/heatlog.js "%APPDATA%\dance-projector\heatlog\<date>.jsonl"` to check that the crosses really arrive live, how fast a heat is recognised, and what the judges' tablets field does; tune the quorum if needed (C-53).
+- Add the results page (`http://<pc>:8788/out/results.html`) as a browser source in OBS, and try an announcement at the next event (Load results once the final is finished).
 - User: print a round start list in the local DanS (Pardubice event has rounds), read it on paper with the Logitech under the real light; ask the organizers which sheets you will receive and whether you can get one per round.
 - User, before the MČR: fetch both events (Saturday CS1747, Sunday) in On demand mode so the offline copies hold the start lists and judge lists; fill the judge gallery for both.
 - User: try the Competitors tab with real data – Load from DanS round in On demand mode, Ctrl+V from WhatsApp Desktop, the webcam, and the phone upload page from the organizer's phone on the venue Wi-Fi (Windows may ask about the firewall for port 8788: allow private networks).

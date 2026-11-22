@@ -61,3 +61,14 @@ flowchart LR
 - Own projection: port 8788, page `/out/competitors.html`, own **Push competitors**. Whole round or one competitor in spotlight.
 - Photos: drag and drop, file picker, Ctrl+V (WhatsApp Desktop copy), webcam, phone upload page with QR code.
 - Details: [Docs/competitors/SPEC.md](Docs/competitors/SPEC.md).
+
+## After the MČR weekend (2026-11-22, decisions D-26 to D-28)
+
+- **Judges** tab = judge selection per side on top + the judge gallery below (Judge selection tab removed). Ctrl+V pastes a photo onto the selected judge card.
+- New **Results** tab: announce a finished competition from the last place to the winner (Top 3 with ties, or the whole final); page `/out/results.html` on the competitor port. Details: [Docs/results/SPEC.md](Docs/results/SPEC.md).
+- Competitor **club** and **sponsor**: from DanS, editable, shown on the competitor and results pages.
+
+## Heat now / next (2026-11-22, decision D-29)
+
+- New **Heats** tab: for every running round, the heat on the floor now and the next one, with the start numbers, from the judges' marks (automatic mode) with a margin of error for lagging judges and wrong numbers, and **Next heat / Back** by hand. A short line in the side-panel floor boxes. For the operator only, nothing on screen.
+- Heat log for checking at an event. Details: [Docs/heats/SPEC.md](Docs/heats/SPEC.md).

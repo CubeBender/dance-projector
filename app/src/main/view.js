@@ -5,7 +5,8 @@ const { buildHeats } = require('./model');
 const { themeFor, themeView } = require('./theme');
 const { mainPhoto } = require('./gallery');
 const { sortJudges } = require('./panels');
-const { fromStartlist, mergeCompetitors, findByNumber, screenName, numberKey } = require('./competitors');
+const { fromStartlist, mergeCompetitors, findByNumber, screenName, numberKey, dansKey } = require('./competitors');
+const { finalRound, placesFromDraw, placeGroups, ladder } = require('./results');
 
 // Crop is { x, y } in percent (focus point) and zoom >= 1. Missing crop = centred, upper third.
 function cleanCrop(c) {
@@ -142,19 +143,22 @@ function outputState(model, raw, store, status) {
 // A competitor without a photo of its own shows the photo the same dancer(s) have in the other event of a two-day
 // competition (found by IDT, C-38) – marked `borrowed`, so the window can say so. A photo added here wins.
 function competitorList(raw, store) {
-  return mergeCompetitors(fromStartlist(raw?.startlist, raw?.draws), store.storedCompetitors()).map((c) => {
+  // start numbers DanS put in round draws, finals read for the results included (D-26)
+  return mergeCompetitors(fromStartlist(raw?.startlist, { ...raw?.draws, ...raw?.results }), store.storedCompetitors()).map((c) => {
     if (c.photos.length) return c;
     const other = store.photosFromOtherEvent(c.people.map((p) => p.idt));
     return other ? { ...c, photos: other.photos, main: other.main, borrowed: other.eventKey } : c;
   });
 }
 
-// One competitor card as the output page draws it. The page never gets IDTs or clubs, only what it shows.
+// One competitor card as the output page draws it. The page never gets IDTs, only what it shows: since D-27 that
+// includes the club and the sponsor (empty when there is none).
 function competitorView(c) {
   const portrait = mainPhoto(c);
   const n = screenName(c);
   return {
     number: Number(c.number), kind: c.kind, first: n.first, last: n.last, surnames: n.surnames,
+    club: c.club || '', sponsor: c.sponsor || '',
     photo: portrait ? `/photos/${encodeURIComponent(portrait.file)}` : null,
     crop: cleanCrop(portrait?.crop),
   };
@@ -185,6 +189,7 @@ function competitorState(model, raw, store) {
     .map((n) => competitorView({ ...(findByNumber(list, n) || { kind: 'solo', people: [] }), number: n }));
   const spot = numberKey(scr.spotlight);
   return {
+    results: resultsState(model, raw, store, list),
     theme: themeView(themeFor(store.cfg, store.cfg.eventId)),
     language: store.cfg.language,
     event: model?.event ? { name: model.event.name, location: model.event.location, date: model.event.date } : null,
@@ -198,4 +203,38 @@ function competitorState(model, raw, store) {
   };
 }
 
-module.exports = { outputState, judgeView, cleanCrop, slotJudges, competitorList, competitorState, competitorView };
+// ---------------------------------------------------------------------------------------------------------
+// Results announcement (decision D-26)
+// ---------------------------------------------------------------------------------------------------------
+
+// What the results page draws (/out/results.html on the competitor port), or null when no results are loaded:
+//   header   { number, title, titleEn, round } of the competition
+//   scope    'top3' | 'all'
+//   rows     the ladder, best place first: [{ label: '1.' | '2.–3.', place, revealed, competitors: [card] }]
+//   current  the row revealed last (shown large), null before the first reveal
+//   step / total / done   how far the announcement is
+// A card is competitorView() plus `place` (the label). Places come from the final's draw kept in raw.results.
+// opts.step overrides the revealed count (the window passes Infinity to list every place for the operator).
+function resultsState(model, raw, store, list = competitorList(raw, store), opts = {}) {
+  const r = store.cfg.results || {};
+  const draw = r.roundId ? raw?.results?.[r.roundId] : null;
+  if (!r.competitionId || !draw) return null;
+  const comp = model?.competitions.find((c) => c.id === r.competitionId) || null;
+  const rawComp = (raw?.competitions || []).find((c) => c.id === r.competitionId);
+  const final = (rawComp?.rounds || []).find((x) => x.id === r.roundId) || finalRound(rawComp);
+  const byKey = new Map(list.map((c) => [c.key, c]));
+  const groups = placeGroups(placesFromDraw(draw), r.scope === 'all' ? 'all' : 'top3');
+  // a finalist is found by its DanS start-list id (photos, names, club); by number when the start list misses it
+  const card = (e, label) => {
+    const c = byKey.get(dansKey(e.dansId)) || findByNumber(list, e.number) || { kind: 'solo', people: [] };
+    return { ...competitorView({ ...c, number: e.number || c.number }), place: label };
+  };
+  const l = ladder(groups.map((g) => ({ ...g, entries: g.entries.map((e) => ({ ...e, label: g.label })) })), opts.step ?? r.step, (e) => card(e, e.label));
+  return {
+    header: comp ? { number: comp.number, title: comp.title, titleEn: comp.titleEn, round: final?.name || '' } : null,
+    scope: r.scope === 'all' ? 'all' : 'top3',
+    ...l,
+  };
+}
+
+module.exports = { resultsState, outputState, judgeView, cleanCrop, slotJudges, competitorList, competitorState, competitorView };

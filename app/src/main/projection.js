@@ -25,6 +25,8 @@ const COMPETITOR_SECTIONS = [
   { key: 'mode', label: 'Whole round / spotlight', pick: (s) => (s.screen ? [s.screen.mode, s.screen.spotlight] : null) },
   { key: 'style', label: 'Style', pick: (s) => s.theme },
   { key: 'layout', label: 'Languages', pick: (s) => [s.language, s.event] },
+  // the results announcement (D-26); its Reveal buttons push this part straight away (pushKeys)
+  { key: 'results', label: 'Results', pick: (s) => s.results },
 ];
 
 class Projection {
@@ -60,6 +62,22 @@ class Projection {
     // In automatic mode this runs every couple of seconds; only real changes count as a push.
     if (this.pushed && !this.changes().length) return false;
     this.pushed = this.draft;
+    this.pushedAt = Date.now();
+    this.server.publish(this.pushed, 'live');
+    this.save();
+    return true;
+  }
+
+  // Puts only some top-level parts of the draft on the projection (e.g. ['results']), leaving the rest as pushed.
+  // The results announcement uses it: every Reveal must reach the screen at once, but competitor-screen edits that
+  // are still being prepared must not ride along. With nothing pushed yet, the whole draft goes.
+  pushKeys(keys) {
+    if (!this.draft) return false;
+    if (!this.pushed) return this.push();
+    const next = { ...this.pushed, updated: this.draft.updated };
+    for (const k of keys) next[k] = this.draft[k];
+    if (JSON.stringify(next) === JSON.stringify(this.pushed)) return false;
+    this.pushed = next;
     this.pushedAt = Date.now();
     this.server.publish(this.pushed, 'live');
     this.save();

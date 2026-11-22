@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Results</title>
+<link rel="stylesheet" href="common.css">
+<!-- Results announcement (decision D-26). Served by the competitor output server (port 8788 by default), next to
+     the competitor page; /api/state there carries
+       results.header   { number, title, titleEn, round } of the competition
+       results.rows     the ladder, best place first: [{ label: '1.' | '2.–3.', place, revealed, competitors: [card] }]
+                        card = { number, kind, first, last, surnames, club, sponsor, photo, crop, place }
+       results.current  the row revealed last (drawn large on the left), null before the first reveal
+       results.step / total / done
+     Places are revealed from the last to the first; the ladder on the right fills in from the bottom.
+     Only the parts that change are redrawn, so a reveal animates the new place and nothing else. -->
+<style>
+  .res { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 780px; gap: 48px; margin-top: 28px; }
+
+  /* ---- left: the place just revealed ---- */
+  .now { min-width: 0; min-height: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 26px; }
+  .now-place { font-family: var(--display); font-variation-settings: "wght" 700, "wdth" 78; font-size: 150px; line-height: 1;
+    color: var(--ink); background: var(--accent); border-radius: 22px; padding: 10px 40px 14px; box-shadow: 0 14px 40px rgba(0,0,0,0.35); }
+  .now-people { display: flex; gap: 40px; justify-content: center; align-items: flex-start; max-width: 100%; }
+  .person { display: flex; flex-direction: column; align-items: center; gap: 18px; min-width: 0; }
+  .person .photo { position: relative; overflow: hidden; border-radius: 18px; background: var(--panel); border-bottom: 6px solid var(--accent);
+    height: var(--ph-h, 470px); aspect-ratio: 3 / 4; flex: none; }
+  .person.couple .photo { aspect-ratio: 1; }
+  .person .photo.none { display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 30%, var(--panel)), var(--panel)); }
+  .person .initials { font-family: var(--display); font-variation-settings: "wght" 600, "wdth" 80; font-size: 150px; color: var(--text); opacity: 0.6; }
+  .person .photo .card { position: absolute; left: 18px; bottom: 16px; font-size: 76px; min-width: 1.5em; height: 1.18em; padding: 0 0.14em; z-index: 1; }
+  .plate { background: var(--plate); border-radius: 16px; padding: 18px 30px 22px; text-align: center; max-width: 100%; box-sizing: border-box; }
+  .first { font-size: 34px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .last { font-family: var(--display); font-variation-settings: "wght" 600, "wdth" 82; font-size: 74px; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .club { margin-top: 10px; font-size: 30px; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sponsor { margin-top: 4px; font-size: 24px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* two tied competitors share the left side: a bit smaller */
+  .now.tied .person .photo { --ph-h: 380px; }
+  .now.tied .last { font-size: 58px; }
+  /* before the first reveal: just the title */
+  .intro { font-family: var(--display); font-variation-settings: "wght" 600, "wdth" 82; font-size: 110px; text-transform: uppercase; letter-spacing: 0.06em; text-align: center; }
+  .intro .bi { align-items: center; }
+
+  /* ---- right: the final ladder, best place at the top ---- */
+  .ladder { min-height: 0; display: flex; flex-direction: column; gap: 12px; justify-content: center; }
+  .ladder-title { color: var(--accent); font-size: 30px; margin: 0 0 6px 4px; }
+  /* --n = competitors sharing the place: a tied row is taller so every name fits */
+  .row { flex: 0 1 calc(112px + (var(--n, 1) - 1) * 64px); min-height: calc(64px * var(--n, 1)); display: grid; grid-template-columns: 132px minmax(0, 1fr); align-items: center; gap: 18px;
+    background: var(--plate); border-radius: 14px; padding: 8px 18px 8px 8px; box-sizing: border-box; position: relative; overflow: hidden; }
+  .row .pl { font-family: var(--display); font-variation-settings: "wght" 700, "wdth" 78; font-size: 54px; text-align: center; color: var(--muted); }
+  .row.revealed .pl { color: var(--text); }
+  .row.current { box-shadow: inset 6px 0 0 var(--accent), 0 0 0 2px var(--accent); }
+  .row.current .pl { color: var(--accent); }
+  .row .who { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .entry { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .entry .card { font-size: 34px; min-width: 1.6em; height: 1.2em; padding: 0 0.12em; flex: none; }
+  .entry .thumb { width: 56px; height: 56px; border-radius: 10px; overflow: hidden; position: relative; flex: none; background: var(--panel); }
+  .entry .txt { min-width: 0; }
+  .entry .nm { font-family: var(--display); font-variation-settings: "wght" 600, "wdth" 84; font-size: 34px; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .entry .cl { font-size: 20px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* a place not announced yet: an empty line where the name will come */
+  .row .hidden-line { height: 14px; border-radius: 7px; background: var(--plate-line); width: 70%; opacity: 0.5; }
+  /* tied rows hold two entries: smaller */
+  .row.many .entry .nm { font-size: 26px; }
+  .row.many .entry .thumb { width: 40px; height: 40px; }
+  .row.many .entry .card { font-size: 26px; }
+  .pop { animation: pop 560ms cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes pop { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .pop { animation: none; } }
+</style>
+</head>
+<body>
+<div class="stage" id="stage"></div>
+<script src="common.js"></script>
+<script>
+const { h, bi, live, keyed, header, applySide, photo, debug, langs } = DP;
+const stage = document.getElementById('stage');
+const T = {
+  title: (lang) => (lang === 'en' ? 'Results' : 'Výsledky'),
+  intro: (lang) => (lang === 'en' ? 'Results' : 'Vyhlášení výsledků'),
+  sponsor: (lang) => (lang === 'en' ? 'Sponsor' : 'Sponzor'),
+};
+const initials = (c) => (c.surnames || []).map((s) => s[0]).join('') || String(c.number || '');
+// "Jana Nováková" for solo, "Novák – Dvořáková" for couples
+const fullName = (c) => (c.kind === 'couple' ? (c.surnames || []).join(' – ') : [c.first, c.last].filter(Boolean).join(' '));
+
+// header() from common.js expects a slot and a competition; the results page has one header, no floor sides
+function headerOf(hd) {
+  if (!hd) return [];
+  const comp = { number: hd.number, title: hd.title, titleEn: hd.titleEn, round: hd.round ? { name: hd.round, competes: null, dances: [] } : null };
+  return header({ label: '', labelEn: '' }, comp, { showDances: false });
+}
+
+// ---- left: one competitor of the place just revealed, large ----
+function person(c) {
+  const box = c.photo ? h('div', { class: 'photo' }, photo(c.photo, c.crop)) : h('div', { class: 'photo none' }, h('span', { class: 'initials' }, initials(c)));
+  if (c.number) box.append(h('div', { class: 'card' }, c.number));
+  const names = c.kind === 'couple' && c.surnames.length > 1 ? c.surnames.map((s) => h('div', { class: 'last' }, s))
+    : [c.first ? h('div', { class: 'first' }, c.first) : null, h('div', { class: 'last' }, c.last || '–')];
+  return h('div', { class: 'person' + (c.kind === 'couple' ? ' couple' : '') }, box,
+    h('div', { class: 'plate' }, names,
+      c.club ? h('div', { class: 'club' }, c.club) : null,
+      // the label in both languages, the sponsor's name once: "Sponzor / Sponsor: Dance point"
+      c.sponsor ? h('div', { class: 'sponsor' }, `${[...new Set(langs().filter(Boolean).map(T.sponsor))].join(' / ')}: ${c.sponsor}`) : null));
+}
+function nowPart(r) {
+  const cur = r.current;
+  if (!cur) return h('div', { class: 'now' }, h('div', { class: 'intro enter' }, bi(T.intro)));
+  return h('div', { class: 'now' + (cur.competitors.length > 1 ? ' tied' : '') },
+    h('div', { class: 'now-place pop' }, cur.label),
+    h('div', { class: 'now-people pop', style: { animationDelay: '120ms' } }, cur.competitors.map(person)));
+}
+
+// ---- right: one ladder row ----
+function entry(c) {
+  return h('div', { class: 'entry' },
+    c.number ? h('div', { class: 'card' }, c.number) : null,
+    h('div', { class: 'thumb' }, c.photo ? photo(c.photo, c.crop) : null),
+    h('div', { class: 'txt' }, h('div', { class: 'nm' }, fullName(c) || '–'),
+      c.club || c.sponsor ? h('div', { class: 'cl' }, [c.club, c.sponsor].filter(Boolean).join(' · ')) : null));
+}
+function fillRow(el, row, isCurrent, animate) {
+  el.className = 'row' + (row.revealed ? ' revealed' : '') + (isCurrent ? ' current' : '') + (row.competitors.length > 1 ? ' many' : '');
+  const who = row.revealed ? h('div', { class: 'who' + (animate ? ' pop' : '') }, row.competitors.map(entry)) : h('div', { class: 'who' }, h('div', { class: 'hidden-line' }));
+  el.replaceChildren(h('div', { class: 'pl' }, row.label), who);
+}
+
+function render(state) {
+  applySide(document.body, { color: state.theme?.accent });
+  document.body.classList.add('whole');
+  const r = state.results;
+  // The frame (header, ladder rows) is rebuilt only when the competition, the scope or the places change.
+  const frameKey = r ? JSON.stringify([r.header, r.rows.map((x) => [x.label, x.size])]) : 'none';
+  keyed(stage, frameKey, () => {
+    if (!r) return debug ? [h('div', { class: 'empty-hint' }, 'Results: load a finished competition in the app')] : [];
+    return [...headerOf(r.header),
+      h('div', { class: 'res' },
+        h('div', { class: 'now-slot' }),
+        h('div', { class: 'ladder' }, h('div', { class: 'ladder-title caps enter', '--i': 1 }, bi(T.title, 'inline')),
+          r.rows.map((row, i) => h('div', { class: 'row enter', '--i': i + 2, '--n': row.size || 1, 'data-i': i }))))];
+  });
+  if (!r) return;
+  // the left side: redrawn when the current place changes
+  const slot = stage.querySelector('.now-slot');
+  const curKey = JSON.stringify(r.current);
+  if (slot.dataset.key !== curKey) {
+    const el = nowPart(r);
+    el.classList.add('now-slot'); el.dataset.key = curKey;
+    slot.replaceWith(el);
+  }
+  // each ladder row on its own: only a row that has just been revealed animates
+  const curIndex = r.current ? r.rows.indexOf(r.rows.find((x) => x.label === r.current.label)) : -1;
+  stage.querySelectorAll('.row').forEach((el) => {
+    const i = Number(el.dataset.i), row = r.rows[i];
+    const key = JSON.stringify([row, i === curIndex]);
+    if (el.dataset.key === key) return;
+    const wasHidden = !el.classList.contains('revealed');
+    el.dataset.key = key;
+    fillRow(el, row, i === curIndex, row.revealed && wasHidden && el.dataset.drawn === '1');
+    el.dataset.drawn = '1';
+  });
+}
+// Names don't wrap; one that doesn't fit its line gets a smaller font (down to 60 %) instead of being cut.
+function shrinkNames() {
+  for (const e of stage.querySelectorAll('.nm, .last, .first')) {
+    e.style.fontSize = '';
+    if (e.scrollWidth <= e.clientWidth + 1) continue;
+    const size = parseFloat(getComputedStyle(e).fontSize);
+    e.style.fontSize = Math.max(size * 0.6, size * (e.clientWidth - 2) / e.scrollWidth) + 'px';
+  }
+}
+new ResizeObserver(shrinkNames).observe(stage);
+document.fonts?.ready.then(shrinkNames);
+live((state) => { render(state); shrinkNames(); });
+</script>
+</body>
+</html>

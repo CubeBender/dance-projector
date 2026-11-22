@@ -13,8 +13,8 @@
 // The organizer still refers to competitors by number ("photo of 112"); numberKey() + byNumber lookups do that.
 //
 // Two sources are merged:
-//   DanS start list – number (when given), solo person or couple, IDTs, club (read-only)
-//   stored entries  – competitors.json: anything typed in the app (names, kind, club), photos, typed competitors
+//   DanS start list – number (when given), solo person or couple, IDTs, club, sponsor (read-only)
+//   stored entries  – competitors.json: anything typed in the app (names, kind, club, sponsor), photos, typed competitors
 // Typed values win over DanS, like judge names in the gallery.
 //
 // Stored entry (competitors.json → { "<event key>": { "<key>": entry } }):
@@ -24,7 +24,7 @@
 //                                              offline copy has no numbers, the printed sheet has; it wins while set
 //     kind: 'solo' | 'couple',                 only when set in the app
 //     people: [{ name, surname, idt }],        only when edited in the app (replaces the DanS people as a whole)
-//     club,                                    optional
+//     club, sponsor,                           optional; typed in the app, win over DanS while not empty (D-27)
 //     photos: [{ file, hash, crop }], main,    same shape as the judge gallery (gallery.js)
 //     origin: 'manual' | 'phone',              how an 'm:' entry came to exist
 //   }
@@ -73,7 +73,8 @@ function dansPeople(entry) {
 
 const dansKey = (id) => `dans:${id}`;
 
-// Competitors DanS knows: Map('dans:<id>' -> { key, dansId, number, kind, people, club }).
+// Competitors DanS knows: Map('dans:<id>' -> { key, dansId, number, kind, people, club, sponsor }).
+// sponsor is set for a few competitors only (7 of 283 at the MČR); empty otherwise.
 // number is null until DanS has one: it is on the start-list entry once staff give numbers, and a round's draw
 // carries DanS's number too (draws = { roundId: { competitors: [{ id, number }] } }). Nothing else makes a number.
 function fromStartlist(startlist = [], draws = {}) {
@@ -83,7 +84,7 @@ function fromStartlist(startlist = [], draws = {}) {
   for (const s of startlist || []) {
     const who = dansPeople(s);
     if (!s?.id || !who) continue;
-    out.set(dansKey(s.id), { key: dansKey(s.id), dansId: s.id, number: numberKey(s.number ?? numberById.get(s.id)), ...who, club: s.club || '' });
+    out.set(dansKey(s.id), { key: dansKey(s.id), dansId: s.id, number: numberKey(s.number ?? numberById.get(s.id)), ...who, club: String(s.club || '').trim(), sponsor: String(s.sponsor || '').trim() });
   }
   return out;
 }
@@ -94,7 +95,8 @@ function drawNumbers(draw) {
 }
 
 // Every competitor of the event as the window lists them:
-//   { key, number (or null), kind, people, club, photos, main, inDans, stored, origin, dansPeople, sameNumber }
+//   { key, number (or null), kind, people, club, sponsor, photos, main, inDans, stored, origin, dansPeople, dansClub,
+//     dansSponsor, sameNumber }
 // Order: by number; competitors without a number after them, by surname.
 // dans = fromStartlist(); stored = the event's object from competitors.json.
 // A 'dans:' entry whose competitor is not in the start list we have (removed in DanS, or no start list read yet)
@@ -112,7 +114,9 @@ function mergeCompetitors(dans, stored = {}) {
       number: d ? numberKey(s.printNumber) || d.number : key.startsWith('m:') ? numberKey(s.number) : null,
       // where the number comes from: 'dans' (start list / draw), 'print' (read from a printout), 'typed'
       numberFrom: d ? (numberKey(s.printNumber) ? 'print' : d.number ? 'dans' : null) : numberKey(s.number) ? 'typed' : null,
-      club: s.club ?? d?.club ?? '',
+      // typed club / sponsor win; an empty field falls back to DanS (the window shows the DanS value as a hint)
+      club: s.club || d?.club || '', sponsor: s.sponsor || d?.sponsor || '',
+      dansClub: d?.club || '', dansSponsor: d?.sponsor || '',
       photos: s.photos || [], main: s.main || null,
       inDans: !!d, stored: !!stored[key], origin: d ? 'dans' : key.startsWith('dans:') ? 'gone' : s.origin || 'manual',
       dansPeople: d?.people || null, // shown as hints when the typed names differ

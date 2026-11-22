@@ -32,9 +32,10 @@
 
 <nav class="tabs">
   <button class="tab active" data-tab="competitions">Competitions</button>
-  <button class="tab" data-tab="panel">Judge selection</button>
   <button class="tab" data-tab="judges">Judges</button>
   <button class="tab" data-tab="competitors">Competitors</button>
+  <button class="tab" data-tab="heats">Heats</button>
+  <button class="tab" data-tab="results">Results</button>
   <button class="tab" data-tab="style">Style</button>
 </nav>
 
@@ -61,8 +62,14 @@
     <p class="empty" id="comps-empty" hidden></p>
   </section>
 
+  <!-- Judges (D-28): what the judge screen shows on top (selection per side), the gallery of every judge below –
+       laid out like the Competitors tab. -->
   <section id="tab-judges" class="pane" hidden>
+    <!-- Judge selection per screen side: panel from DanS (editable) or own selection from the gallery -->
+    <p class="hint">For each side choose <b>From DanS</b> (fetch, pick the competition, and its drawn panel appears; editable, <b>Use DanS panel</b> undoes your edits) or <b>Own selection</b> (judges from the gallery, no DanS needed). Nothing reaches the screen until you push.</p>
+    <div id="panels"></div>
     <!-- Judge gallery: kept between events, one entry per IDT (gallery.js) -->
+    <h3 class="section-title">Judge gallery</h3>
     <div class="tools">
       <div class="chips" id="jfilter">
         <button data-f="all" class="chip active">All</button>
@@ -77,15 +84,9 @@
       <button id="gallery-import" class="primary" title="Import every photo named IDT_Surname_Name[ Number] from a folder. Photos already in the gallery are skipped.">Import folder…</button>
     </div>
     <div class="import-report" id="import-report" hidden></div>
-    <p class="hint">Saved per IDT and reused at every event. The big photo is the one on screen: click it to adjust the framing. Click a small photo to make it the main one.</p>
+    <p class="hint">Saved per IDT and reused at every event. The big photo is the one on screen: click it to adjust the framing. Click a small photo to make it the main one. <b>Ctrl+V</b> pastes a copied image as the main photo of the selected judge: click a card to select it.</p>
     <div class="judges" id="judges"></div>
     <p class="empty" id="judges-empty" hidden></p>
-  </section>
-
-  <!-- Judge selection per screen side: panel from DanS (editable) or own selection from the gallery -->
-  <section id="tab-panel" class="pane" hidden>
-    <p class="hint">For each side choose <b>From DanS</b> (fetch, pick the competition, and its drawn panel appears; editable, <b>Use DanS panel</b> undoes your edits) or <b>Own selection</b> (judges from the gallery, no DanS needed). Nothing reaches the screen until you push.</p>
-    <div id="panels"></div>
   </section>
 
   <!-- Competitors of semifinals and finals (decision D-22): what the competitor screen shows, the phone upload
@@ -109,6 +110,18 @@
     <p class="hint"><b>Ctrl+V</b> pastes a copied image (in WhatsApp Desktop: right-click the photo → Copy) to the selected competitor; with none selected it asks for the number. Click a card to select it. Image files can be dropped on any card.</p>
     <div class="ccards" id="clist"></div>
     <p class="empty" id="clist-empty" hidden></p>
+  </section>
+
+  <!-- Heats (decision D-29): which heat of each running round is on the floor and which is next, from the judges'
+       marks (automatic mode) and the operator's Next heat / Back. For the operator only. Filled in by heats.js. -->
+  <section id="tab-heats" class="pane" hidden>
+    <div id="heats"></div>
+  </section>
+
+  <!-- Results announcement (decision D-26): pick a finished competition, read its final, reveal from the last place
+       to the first. Filled in by results.js. -->
+  <section id="tab-results" class="pane" hidden>
+    <div id="results"></div>
   </section>
 
   <!-- Colours and background of the projection, one style per event (decision D-15) -->
@@ -354,6 +367,8 @@
 
 <script src="app.js"></script>
 <script src="competitors.js"></script>
+<script src="results.js"></script>
+<script src="heats.js"></script>
 <script src="printout.js"></script>
 </body>
 </html>

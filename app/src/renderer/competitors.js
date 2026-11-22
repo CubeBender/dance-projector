@@ -223,6 +223,15 @@ function compCard(c) {
     return h('label', { class: 'row small' }, 'Start number', input);
   })();
 
+  // Club and sponsor (D-27), shown on the competitor and results screens. DanS values are the placeholders: an empty
+  // field uses them, typing replaces them (also for typed competitors, which have no DanS values).
+  const extra = (field, label, dansValue) => {
+    const input = h('input', { value: c.stored ? (c[field] !== dansValue ? c[field] : '') : '', placeholder: dansValue || (field === 'sponsor' ? 'none' : ''), 'data-x': field });
+    input.addEventListener('change', () => window.dp.compUpdate(key, { [field]: input.value }).then(applyOr));
+    return h('label', { class: 'stack' }, h('small', null, label), input);
+  };
+  const clubRow = h('div', { class: 'names' }, extra('club', 'Club', c.dansClub), extra('sponsor', 'Sponsor', c.dansSponsor));
+
   card.append(ph, h('div', { class: 'jinfo' },
     h('div', { class: 'jtop' }, h('span', { class: 'jname' }, c.label || h('span', { class: 'sub' }, 'No name yet')), kind),
     h('div', { class: 'jfed' },
@@ -234,6 +243,7 @@ function compCard(c) {
       own && c.photos.length > 1 ? h('span', { class: 'tag' }, `${c.photos.length} photos`) : null),
     numberField,
     people,
+    clubRow,
     typedDiffers ? h('div', { class: 'sub' }, `DanS has: ${(c.dansPeople || []).map((p) => `${p.name} ${p.surname}`).join(' & ')}`) : null,
     noteEl,
     strip,

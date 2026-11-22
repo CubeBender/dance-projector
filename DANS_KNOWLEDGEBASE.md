@@ -110,8 +110,11 @@ With `dans-event` header:
 | `/events/{e}/displays` | Displays attached to the event |
 | `/rounds/{r}` | One round |
 | `/rounds/{r}/draw` | Draw of the round |
-| `/rounds/{r}/draw/competitors` | **Heats**: `competitors[]{id, number, dances[]{heat, completion}, completion, ranking}`; `dances[i]` follows the round's dance order |
+| `/rounds/{r}/draw/competitors` | **Heats**: `competitors[]{id, number, dances[]{heat, completion}, completion, ranking, ranking_to}`; `dances[i]` follows the round's dance order. For a **finished final**, `ranking` is the final place and `ranking_to` the last place of a shared place (null if not shared) – verified 2026-11-22 on CS1747 competition 1 (places 1–6); the app's Results tab reads it (D-26) |
 | `/rounds/{r}/draw/dances` | Draw per dance |
+| `/rounds/{r}/draw` (entity) | Also `dance_sequence[]` with each dance tagged by state (`{"Completed": {id, abbr, name…}}`), `competitors[]`, and `dances_heats[]{round_dance, heats[]{heat, competitors[] (indexes into competitors)}}` – seen 2026-11-22 |
+| `/rounds/{r}/marks` | Judges' marks: `target.Competitor{round_dance_id, judge (letter), competitor_id}`, `value` (`{"Cross": true}` in elimination), `suppressed`, `overridden`. **No timestamp** in the API (the SQLite `mark` table has `created`/`stored`). All marks of the round in one answer (287 on CS1747 comp. 1 semifinal). Unverified: whether tablets send marks while the judge taps or only when the dance is submitted – this decides whether it can show the heat being danced. Marks are confidential until results are out: never put them on screen. Seen 2026-11-22 |
+| `/rounds/{r}/result` | Round result: `competitors[]{competitor, number, completion, rankings[]{ranking, ranking_to, quantity, marks}}` – seen 2026-11-22 |
 | `/index_age`, `/index_class`, `/index_discipline`, `/index_dance`, `/index_series`, `/index_competitors`, `/index_competition_grade`, `/index_official_role`, `/index_authority` | Lookup tables (`id`, `value`, `abbreviation`, `key`) |
 
 `/rounds/{r}/draw*` sounds like an action, but GET only reads. We compared the database before and after: heats and rounds were identical.
@@ -159,7 +162,7 @@ Competition `state` values: `Planned`, `Registration`, `RegistrationClosed`, `Ch
 
 Round `state` values ✅: `Paused` = judging not enabled; `InProgress` = judging enabled (**Povolit hodnocení**), verified 2026-10-17 on Pardubice competition 3; enabling also sets `started`. A cancelled round has state `Cancelled` and `cancelled`/`cancellation_reason` set, and still appears in `/competitions`. `Completed`, `Finished` exist in the UI code.
 
-Round dance: `id`, `dance`, `dance_order`, `state` (`Active`, `Suppressed`), `heat_count`, `seed_method` (`RandomFixed`, `NoSeedSingleHeat`), `completed_at` (null until every judge has finished the dance). The current dance is the first one without `completed_at`; DanS's own display uses the same rule.
+Round dance: `id`, `dance`, `dance_order`, `state` (`Active`, `Suppressed`), `heat_count`, `seed_method` (`RandomFixed`, `NoSeedSingleHeat`), `completed_at` (null until every judge has finished the dance). The current dance is the first one without `completed_at`; DanS's own display uses the same rule. There is **no "current heat"** field anywhere (API or SQLite): DanS knows when a whole dance is finished, not which heat of it is on the floor. Round judges carry `round_dance` (the dance each judge's tablet is on, null once done) and `assessment_state` (`Completed` once done).
 
 Competitor completion values: `YetUnknown`, `Recalled`, `Losing`, `Completed`, `Retired`, `Disqualified`, `Excluded`.
 

@@ -15,6 +15,8 @@ for (const bad of ['/competitions/results/deliverCompetition', '/events/x/report
   assert.throws(() => assertAllowed(bad), `should refuse ${bad}`);
 }
 assertAllowed('/rounds/1f1c9b93-8ff2-6470-8b73-ff36bfb294d1/draw/competitors');
+assertAllowed('/rounds/1f1c9b93-8ff2-6470-8b73-ff36bfb294d1/marks'); // read only (heat tracking, D-29)
+assert.throws(() => assertAllowed('/rounds/1f1c9b93-8ff2-6470-8b73-ff36bfb294d1/marks/delete'));
 
 // no PINs anywhere
 assert(!JSON.stringify(raw.judges).includes('"pin"'), 'judge PINs must not be in the fixture');

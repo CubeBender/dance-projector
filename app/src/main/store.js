@@ -51,6 +51,10 @@ const DEFAULT_CONFIG = {
   //   mode      'round' = all of them as cards | 'spotlight' = one competitor large
   //   spotlight start number shown in spotlight mode
   competitorScreen: { competitionId: null, roundId: null, roundName: '', numbers: [], mode: 'round', spotlight: null },
+  // Results announcement (D-26): the competition, the final round whose places were read (its draw is kept in the
+  // offline copy under results), how many finalists are announced, and how many place groups are revealed so far.
+  //   scope 'top3' = places 1–3 (with every competitor tied on them) | 'all' = the whole final
+  results: { competitionId: null, roundId: null, scope: 'top3', step: 0 },
   // Phone upload page (C-34): off until switched on; key = the secret part of the link
   phoneUpload: { enabled: false, key: null },
   webcamId: null,        // camera chosen in the Webcam window (C-35)

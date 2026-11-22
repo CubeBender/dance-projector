@@ -44,6 +44,7 @@ contextBridge.exposeInMainWorld('dp', {
   judgeUpdate: (fedId, patch) => ipcRenderer.invoke('judge-update', fedId, patch),
   judgeCreate: (judge) => ipcRenderer.invoke('judge-create', judge),
   judgePhotosAdd: (fedId, files, makeMain) => ipcRenderer.invoke('judge-photos-add', fedId, files ? [...files].map((f) => webUtils.getPathForFile(f)) : null, makeMain),
+  judgePhotoBytes: (fedId, bytes) => ipcRenderer.invoke('judge-photo-bytes', fedId, bytes), // Ctrl+V on a judge card (D-28)
   judgePhotoMain: (fedId, file) => ipcRenderer.invoke('judge-photo-main', fedId, file),
   judgePhotoDelete: (fedId, file) => ipcRenderer.invoke('judge-photo-delete', fedId, file),
   judgeDelete: (fedId) => ipcRenderer.invoke('judge-delete', fedId),
@@ -63,6 +64,13 @@ contextBridge.exposeInMainWorld('dp', {
   printoutApply: (p) => ipcRenderer.invoke('printout-apply', p),
   onPrintout: (fn) => ipcRenderer.on('printout', (_e, r) => fn(r)), // a printout photo arrived from the phone
   pushCompetitors: () => ipcRenderer.invoke('push-competitors'),
+  // ---- results announcement (D-26) ----
+  resultsSet: (patch) => ipcRenderer.invoke('results-set', patch),       // { competitionId } | { scope: 'top3' | 'all' }
+  resultsLoad: (compId) => ipcRenderer.invoke('results-load', compId),   // reads the final's places from DanS
+  resultsStep: (move) => ipcRenderer.invoke('results-step', move),       // { delta: ±1 } | { step: n | 'all' }; on screen at once
+  // heats (D-29): dir +1 = Next heat, -1 = Back; following the judges' marks on / off for one round
+  heatMove: (roundId, dir) => ipcRenderer.invoke('heat-move', roundId, dir),
+  heatAuto: (roundId, on) => ipcRenderer.invoke('heat-auto', roundId, on),
   // the list. A competitor is addressed by its key ('dans:<id>' or 'm:<id>', see competitors.js), not its number,
   // because many have no start number yet. New: { number (optional), kind, people: [{ name, surname, idt }] }
   compCreate: (c) => ipcRenderer.invoke('comp-create', c),

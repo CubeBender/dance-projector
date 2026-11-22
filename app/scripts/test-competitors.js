@@ -134,7 +134,8 @@ assert.strictEqual(st.screen.competitors[0].photo, `/photos/${f1}`);
 assert.strictEqual(st.screen.competitors[1].last, 'Dvořák – Malá Veselá');
 assert.deepStrictEqual(st.screen.header, { number: '5', title: 'Finále sólo', titleEn: '', round: '' });
 assert.ok(!JSON.stringify(st).includes('9000000'), 'no IDT reaches the output page');
-assert.ok(!JSON.stringify(st).includes('Klub'), 'no club reaches the output page');
+// since D-27 (2026-11-22) the club is shown on screen; the IDT still never is
+assert.strictEqual(st.screen.competitors[0].club, 'Klub A', 'the club reaches the output page');
 store.updateConfig({ competitorScreen: { mode: 'spotlight', spotlight: '112' } });
 st = competitorState(null, raw, store);
 assert.strictEqual(st.screen.spotlight.number, 112);

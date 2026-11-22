@@ -29,7 +29,10 @@ const { OutputServer } = require('./server');
 const { Projection, COMPETITOR_SECTIONS } = require('./projection');
 const { panelKey, applyPanels, togglePanel, toggleManual, cleanLetter, SORTS, moveInOrder } = require('./panels');
 const { cleanTheme, themeFor, themeKey, PRESETS } = require('./theme');
-const { outputState, judgeView, cleanCrop, slotJudges, competitorList, competitorState } = require('./view');
+const { outputState, judgeView, cleanCrop, slotJudges, competitorList, competitorState, resultsState } = require('./view');
+const { resultsReady, placesFromDraw, placeGroups, clampStep } = require('./results');
+const { heatPlan, RoundTracker } = require('./heattrack');
+const { pickRoundId } = require('./roundpick');
 const { sortForImport, mainPhoto } = require('./gallery');
 const { numberKey, parseNumbers, drawNumbers, screenName, findByNumber, attachToDans } = require('./competitors');
 const csts = require('./csts');
@@ -81,6 +84,14 @@ async function addJudgePhoto(fedId, file, { makeMain = false } = {}) {
     else store.addPhoto(fedId, tmp, { hash, makeMain, enc: ENCODER });
   } finally { fs.rm(tmp, { force: true }, () => {}); }
   return known ? 'redone' : 'added';
+}
+
+// The same for an image that arrives as bytes: pasted with Ctrl+V on the Judges tab (D-28), like the competitor
+// photos. The bytes go to a temporary file first, because the decoder reads files.
+async function addJudgePhotoBytes(fedId, bytes, opts) {
+  const tmp = path.join(app.getPath('temp'), `dp-in-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
+  fs.writeFileSync(tmp, Buffer.from(bytes));
+  try { return await addJudgePhoto(fedId, tmp, opts); } finally { fs.rm(tmp, { force: true }, () => {}); }
 }
 
 // Turns one stored photo by 90/180/270 degrees (Adjust photo window). The result is a new file, so the
@@ -307,7 +318,113 @@ function rebuild() {
   applyPanels(model, store.panelOverrides(store.cfg.eventId));
   attachCompetitors();
   applyFollow();
+  updateHeats();
   publish();
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Heats: which heat is on the floor and which is next (D-29, heattrack.js)
+// ---------------------------------------------------------------------------------------------------------
+
+const trackers = new Map();    // round id -> RoundTracker; kept while the app runs, so Next / Back survive a pause
+const LIVE_MAX_AGE = 30000;    // marks older than this are not "live" any more (DanS stopped answering, mode changed)
+
+// Rounds being danced now: the current round of every competition whose round is in a running state. The poller
+// reads their marks in automatic mode (poller.liveRounds).
+function liveRoundIds(r) {
+  const states = store.cfg.runningStates?.length ? store.cfg.runningStates : ['InProgress'];
+  return (r?.competitions || []).map((c) => {
+    const rd = (c.rounds || []).find((x) => x.id === pickRoundId(c));
+    return rd && states.includes(rd.state) ? rd.id : null;
+  }).filter(Boolean);
+}
+
+// Dance lookup id -> { abbr, name } for the heat plan
+function danceNames() {
+  const m = new Map((raw?.indexes?.dance || []).map((d) => [d.id, { abbr: d.abbreviation || d.value, name: d.value }]));
+  return (id) => m.get(id) || {};
+}
+
+// Feeds every running round's tracker with the latest DanS data. Marks count only when they are live: read in
+// automatic mode within the last 30 s. Without them the tracker still follows the dances DanS marks finished, and
+// the operator's Next heat / Back.
+function updateHeats() {
+  const names = danceNames();
+  for (const rid of liveRoundIds(raw)) {
+    const rc = raw.competitions.find((c) => (c.rounds || []).some((x) => x.id === rid));
+    const round = rc.rounds.find((x) => x.id === rid);
+    const live = raw.live?.[rid];
+    const fresh = !!live && mode() === 'auto' && Date.now() - live.at < LIVE_MAX_AGE;
+    if (!trackers.has(rid)) trackers.set(rid, new RoundTracker(rid));
+    const t = trackers.get(rid);
+    t.update(heatPlan(round, raw.draws?.[rid], names), round, fresh ? live.marks : null, fresh ? live.at : Date.now());
+    if (fresh) logHeats(rid, rc, round, live);
+  }
+}
+
+// The heat log (D-29): one line per poll in which something changed in a running round – marks added or taken back,
+// dances submitted, the judges' tablets moving – and where the tracker put the round. Kept in the app's data folder
+// (heatlog/<date>.jsonl, real data, never in the repository) to check at an event how live the marks really are and
+// to tune the margin of error. scripts/heatlog.js prints it as a timeline.
+const heatLogSeen = new Map(); // round id -> { at, marks: Map key -> value, tablets: string }
+function logHeats(rid, rc, round, live) {
+  const prev = heatLogSeen.get(rid) || { at: 0, marks: new Map(), tablets: '' };
+  if (prev.at === live.at) return; // this read is logged already (rebuild runs for many reasons)
+  const t = trackers.get(rid);
+  const plan = t.plan;
+  const letter = new Map([...(model?.judges.values() || [])].map((j) => [j.personId, j.letter]));
+  // where a competitor dances: round dance + competitor id -> dance, heat, number
+  const where = new Map();
+  plan.dances.forEach((dn) => dn.heats.forEach((ht) => ht.competitors.forEach((c) => where.set(`${dn.id}|${c.id}`, { dance: dn.abbr, heat: ht.heat, number: c.number }))));
+  const danceAbbr = new Map(plan.dances.map((dn) => [dn.id, dn.abbr]));
+  // every mark as key -> value; the key says what the mark is about
+  const marks = new Map();
+  for (const m of live.marks || []) {
+    const tc = m.target?.Competitor, td = m.target?.DanceCompletion, tr = m.target?.RoundCompletion;
+    const key = tc ? `c|${tc.round_dance_id}|${tc.competitor_id}|${tc.judge}` : td ? `d|${td.round_dance_id}|${td.judge}` : tr ? `r|${tr.judge}` : null;
+    if (key) marks.set(key, JSON.stringify(m.value) + (m.suppressed ? ' suppressed' : ''));
+  }
+  const describe = (key, value) => {
+    const [kind, a, b, c] = key.split('|');
+    if (kind === 'c') return { judge: c, ...(where.get(`${a}|${b}`) || { dance: danceAbbr.get(a) || '?', heat: null, number: null }), value };
+    if (kind === 'd') return { judge: b, submitted: danceAbbr.get(a) || '?', value };
+    return { judge: a, roundDone: true, value };
+  };
+  const changed = [];
+  for (const [k, v] of marks) if (prev.marks.get(k) !== v) changed.push(describe(k, v));
+  const removed = [...prev.marks.keys()].filter((k) => !marks.has(k)).map((k) => describe(k, 'removed'));
+  // each judge's tablet: letter, the dance it is on, the assessment state
+  const tablets = (round.judges || []).map((j) => `${letter.get(j.person) || '?'}:${danceAbbr.get(j.round_dance) || '-'}:${j.assessment_state}`).join(' ');
+  const first = !prev.at;
+  heatLogSeen.set(rid, { at: live.at, marks, tablets });
+  if (!first && !changed.length && !removed.length && tablets === prev.tablets) return;
+  const v = t.view();
+  const line = {
+    t: new Date(live.at).toISOString(), competition: rc.competition_number, round: round.abbreviation,
+    first: first || undefined, // the first read of a round lists how many marks there were, not each one
+    changed: first ? changed.length : changed, removed, tablets,
+    dancesFinished: plan.dances.filter((dn) => dn.completed).map((dn) => dn.abbr).join(' '),
+    now: v.now && `${v.now.dance} heat ${v.now.heat}`, next: v.next ? `${v.next.dance} heat ${v.next.heat}` : 'end of round',
+    source: v.source, reason: v.reason,
+  };
+  try {
+    const dir = path.join(store.dir, 'heatlog');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.appendFileSync(path.join(dir, `${new Date(live.at).toISOString().slice(0, 10)}.jsonl`), JSON.stringify(line) + '\n');
+  } catch { /* the log is a help, never a reason to stop */ }
+}
+
+// The Heats tab and the floor boxes in the side panel: every running round with its heats, now and next.
+function heatsWindowState() {
+  const sides = store.cfg.split ? ['A', 'B'] : ['A'];
+  const slotOf = (compId) => sides.find((k) => store.cfg.slots[k].source !== 'manual' && store.cfg.slots[k].competitionId === compId) || null;
+  const rounds = liveRoundIds(raw).map((rid) => {
+    const v = trackers.get(rid)?.view();
+    const c = model?.competitions.find((x) => x.round?.id === rid);
+    if (!v || !c) return null;
+    return { ...v, competitionId: c.id, number: c.number, title: c.title, roundName: c.round.name, slot: slotOf(c.id) };
+  }).filter(Boolean).sort((a, b) => (a.slot || 'Z').localeCompare(b.slot || 'Z') || a.number - b.number);
+  return { live: mode() === 'auto', rounds };
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -361,6 +478,8 @@ function rendererState() {
       photos: c.photos.map((p) => ({ file: p.file, url: base ? `${base}/photos/${encodeURIComponent(p.file)}` : null, crop: cleanCrop(p.crop) })),
     })),
     competitorScreen: store.cfg.competitorScreen,
+    results: resultsWindowState(base),
+    heats: heatsWindowState(),
     compProjection: compProjection ? { changes: compProjection.changes(), pushedAt: compProjection.pushedAt } : null,
     upload: {
       enabled: !!store.cfg.phoneUpload?.enabled,
@@ -382,9 +501,39 @@ function rendererState() {
         { name: 'Lower third for camera – slot A', path: '/out/lowerthird.html?slot=A' },
         { name: 'Lower third for camera – slot B', path: '/out/lowerthird.html?slot=B' },
         // the competitor projection lives on its own port (C-32)
-        ...(compAddr ? [{ name: `Competitors (port ${compAddr.port})`, path: '/out/competitors.html', port: compAddr.port }] : []),
+        ...(compAddr ? [{ name: `Competitors (port ${compAddr.port})`, path: '/out/competitors.html', port: compAddr.port },
+          // results announcement (D-26): same server, so it has the competitor photos and its own pushed state
+          { name: `Results (port ${compAddr.port})`, path: '/out/results.html', port: compAddr.port }] : []),
       ],
     } : null,
+  };
+}
+
+// The Results tab (D-26): every competition with a final and whether its places can be read yet, what is chosen,
+// and the ladder with names for the operator (all places, revealed or not, so they can read ahead).
+function resultsWindowState(base) {
+  const r = store.cfg.results;
+  const competitions = (raw?.competitions || []).map((rc) => {
+    const c = model?.competitions.find((x) => x.id === rc.id);
+    const ready = resultsReady(rc);
+    return {
+      id: rc.id, number: rc.competition_number, title: c?.title || '', state: rc.state,
+      ready: ready.ok, reason: ready.reason, finalId: ready.final?.id || null, finalName: ready.final?.name || '',
+      loaded: !!(ready.final && raw?.results?.[ready.final.id]),
+    };
+  }).sort((a, b) => a.number - b.number);
+  const list = competitorList(raw, store);
+  const view = resultsState(model, raw, store, list);
+  // the operator sees every place, also the ones not revealed yet: the same ladder with everything revealed
+  const all = view ? resultsState(model, raw, store, list, { step: Infinity }) : null;
+  const photo = (p) => (p && base ? base + p : null); // both output servers serve the same photos folder
+  return {
+    ...r, competitions,
+    total: view?.total || 0, step: view?.step || 0, done: !!view?.done,
+    rows: (all?.rows || []).map((row, i) => ({
+      label: row.label, revealed: !!view.rows[i]?.revealed,
+      competitors: row.competitors.map((c) => ({ number: c.number, name: [c.first, c.last].filter(Boolean).join(' ') || c.surnames.join(' – '), club: c.club, sponsor: c.sponsor, photo: photo(c.photo), crop: c.crop })),
+    })),
   };
 }
 
@@ -441,7 +590,8 @@ function setupIpc() {
   ipcMain.handle('remove-server', (_e, url) => { store.removeServer(url); return rendererState(); });
   ipcMain.handle('refresh-events', async () => { await loadEvents(); publish(); return rendererState(); });
   ipcMain.handle('set-event', (_e, id) => {
-    store.updateConfig({ eventId: id, slots: { A: { competitionId: null }, B: { competitionId: null } } });
+    // a new event: nothing of the old one stays chosen (the results announcement starts empty too)
+    store.updateConfig({ eventId: id, slots: { A: { competitionId: null }, B: { competitionId: null } }, results: { competitionId: null, roundId: null, step: 0 } });
     selectEvent(); return rendererState();
   });
 
@@ -630,6 +780,15 @@ function setupIpc() {
     if (failed.length) dialog.showErrorBox('Judge photos', `These files could not be used:\n${failed.join('\n')}`);
     rebuild(); return rendererState();
   });
+  // An image pasted with Ctrl+V onto the selected judge card (D-28); it becomes the judge's main photo.
+  ipcMain.handle('judge-photo-bytes', async (_e, fedId, bytes) => {
+    fedId = String(fedId || '').trim();
+    if (!/^\d{3,}$/.test(fedId)) return { ...rendererState(), error: 'Choose a judge first.' };
+    store.ensureJudge(fedId);
+    try { await addJudgePhotoBytes(fedId, bytes, { makeMain: true }); }
+    catch (e) { rebuild(); return { ...rendererState(), error: `The image could not be used: ${e.message}` }; }
+    rebuild(); return rendererState();
+  });
   ipcMain.handle('judge-photo-main', (_e, fedId, file) => { store.setMainPhoto(fedId, file); rebuild(); return rendererState(); });
   ipcMain.handle('judge-photo-delete', (_e, fedId, file) => { store.deletePhoto(fedId, file); rebuild(); return rendererState(); });
   // Delete a whole judge from the gallery (the window asks for confirmation first)
@@ -663,6 +822,8 @@ function setupIpc() {
   });
 
   setupCompetitorIpc();
+  setupResultsIpc();
+  setupHeatsIpc();
   setupPrintoutIpc();
   setupPrintoutApplyIpc();
 
@@ -675,6 +836,84 @@ function cleanupFiles() {
   const keep = projection.referencedFiles();
   for (const f of compProjection?.referencedFiles() || []) keep.add(f);
   store.cleanupFiles(keep);
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// IPC: Results tab (D-26)
+// ---------------------------------------------------------------------------------------------------------
+// Choosing and loading only change the prepared state (Push competitors, or the first Reveal, puts it on screen).
+// Reveal / Back / Hide all go on screen at once: the announcer is speaking, there is no time for a second button.
+// Only the results part is pushed then (Projection.pushKeys), so competitor-screen edits in preparation stay off air.
+
+function setupResultsIpc() {
+  const cfg = () => store.cfg.results;
+  const withError = (error) => ({ ...rendererState(), error });
+  const rawComp = (id) => (raw?.competitions || []).find((c) => c.id === id) || null;
+  // how many place groups the loaded results have in the chosen scope (Top 3 / whole final)
+  const groupCount = () => {
+    const draw = cfg().roundId ? raw?.results?.[cfg().roundId] : null;
+    return draw ? placeGroups(placesFromDraw(draw), cfg().scope).length : 0;
+  };
+  const reveal = () => { publish(); compProjection?.pushKeys(['results']); cleanupFiles(); publish(); };
+
+  // patch: { competitionId } picks a competition (results already read for its final are used straight away);
+  // { scope: 'top3' | 'all' } how many are announced. Both start the announcement from the beginning.
+  ipcMain.handle('results-set', (_e, patch) => {
+    const r = cfg();
+    if ('competitionId' in patch) {
+      r.competitionId = patch.competitionId || null;
+      const ready = resultsReady(rawComp(r.competitionId));
+      r.roundId = ready.final && raw?.results?.[ready.final.id] ? ready.final.id : null;
+      r.step = 0;
+    }
+    if (patch.scope === 'top3' || patch.scope === 'all') { r.scope = patch.scope; r.step = 0; }
+    store.config.save(); rebuild(); return rendererState();
+  });
+
+  // Reads the places of the competition's final from DanS (2 GET requests: start list + the final's draw). Manual
+  // mode never contacts DanS: it uses the final as kept in the offline copy, when it was read before.
+  ipcMain.handle('results-load', async (_e, compId) => {
+    const rc = rawComp(compId);
+    if (!rc) return withError('Choose a competition first');
+    const ready = resultsReady(rc);
+    if (!ready.ok) return withError(`${ready.reason}. The places can be read once the final is finished.`);
+    let draw;
+    if (mode() === 'manual') {
+      draw = raw?.results?.[ready.final.id];
+      if (!draw) return withError('Manual mode never contacts DanS, and this final was not read before. Switch to On demand and load it.');
+    } else {
+      try { draw = await poller.fetchResults(ready.final.id); }
+      catch (e) { status = poller.status; publish(); return withError(`Could not read the results from DanS: ${e.message}`); }
+      if (poller.status) status = poller.status;
+    }
+    if (!placesFromDraw(draw).length) return withError('DanS has no places in this final yet.');
+    Object.assign(cfg(), { competitionId: rc.id, roundId: ready.final.id, step: 0 });
+    store.config.save(); rebuild(); return rendererState();
+  });
+
+  // { delta: +1 | -1 } reveals the next place / takes the last one back; { step: n } jumps (0 = hide all,
+  // Infinity = reveal everything). Goes on screen straight away.
+  ipcMain.handle('results-step', (_e, { delta, step } = {}) => {
+    const n = groupCount();
+    if (!n) return withError('Load the results first');
+    const next = step != null ? (step === 'all' ? n : step) : cfg().step + (delta || 0);
+    cfg().step = clampStep(next, n);
+    store.config.save(); reveal(); return rendererState();
+  });
+}
+
+// Heats tab (D-29): the operator moves a round's position by hand, or switches following the marks off / on.
+// Nothing here reaches the projection: it is information for the operator.
+function setupHeatsIpc() {
+  ipcMain.handle('heat-move', (_e, roundId, dir) => {
+    const t = trackers.get(roundId);
+    if (t && (dir === 1 || dir === -1)) t.move(dir);
+    publish(); return rendererState();
+  });
+  ipcMain.handle('heat-auto', (_e, roundId, on) => {
+    trackers.get(roundId)?.setAuto(on);
+    publish(); return rendererState();
+  });
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -768,6 +1007,7 @@ function setupCompetitorIpc() {
     if (patch.kind === 'solo' || patch.kind === 'couple') clean.kind = patch.kind;
     if (Array.isArray(patch.people)) clean.people = cleanPeople(patch.people);
     if ('club' in patch) clean.club = String(patch.club || '').trim().slice(0, 120);
+    if ('sponsor' in patch) clean.sponsor = String(patch.sponsor || '').trim().slice(0, 120); // D-27
     if ('number' in patch && key.startsWith('m:')) {
       const typed = String(patch.number ?? '').trim(), n = numberKey(typed);
       if (typed && !n) return withError('The start number must be a number from 1 to 9999, or empty.');
@@ -1071,6 +1311,7 @@ async function start() {
     poller = new Poller({ dans: new DansClient(store.cfg.server), intervalMs: store.cfg.pollMs });
   }
   // Every successful read: keep an offline copy (for manual mode / starting without DanS) and rebuild.
+  poller.liveRounds = liveRoundIds; // heat tracking (D-29): automatic mode reads the marks of these rounds
   poller.on('raw', (r) => { raw = r; if (!fixtureFile) store.saveSnapshot(r); rebuild(); });
   poller.on('status', (s) => { const changed = s.connected !== status.connected || s.error !== status.error; status = s; if (changed) publish(); else win?.webContents.send('status', s); });
 

@@ -93,3 +93,14 @@
 > After the second round, I can see the Competition 2 having a third round, but is sais no panel yet, but in order to have a round, there needs to be judge panel, am I right?
 >
 > yes, make it per round
+
+## After a day and a half of use: judges merge, results announcement, club and sponsor (2026-11-22)
+> After working with the program for a day and a half, I would do the following changes:
+> 1) Merge together Judges and Judge selection, just like competitors are. Judges could also import photos using ctrl-v, just like competitors do.
+> 2) The program could use a new tab for announcement of the competition winners. We announce eather only the top 3 places (competitors can be tied, but very rarely), or all finalists (all competitors from the final round). During announcing, we want to show the competitors from last to first, showing their final placement. We also want to reveal the final ladder as we reveal the finalists. This data should be accessible when the competition is finished.
+> 3) Adding competitor club and sponsor (if exists).
+
+## Which heat is next (2026-11-22)
+> I will test it later. Now another helpful feature that I am not sure how to implement. We are also showing heats. Right now we broadcast it from Dans as a display that my colleague operates. The issue is, I am sometimes unsure what heat goes next. Is there an accurate way to understand which heat is dansing to know which one should be next?
+>
+> Ok, lets do it as suggested. I believe the crosses are live. But sometimes a judge can lagg behind or accidentally give a cross to somebody who is not dansing right now by selecting a wrong number. So there needs to be some margin of error to the current/ next heat logic.

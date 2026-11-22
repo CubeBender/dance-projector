@@ -9,6 +9,8 @@
 | 5 | OBS show | [Docs/obs-show](Docs/obs-show/PLAN.md) | 4, assets from the user |
 | 6 | Competitors on screen (D-22) | [Docs/competitors](Docs/competitors/PLAN.md) | 3, 4 |
 | 7 | Reading DanS printouts (D-17, D-24) | [Docs/printout](Docs/printout/PLAN.md) | 6 |
+| 8 | Results announcement (D-26) | [Docs/results](Docs/results/PLAN.md) | 6 |
+| 9 | Heat now / next (D-29) | [Docs/heats](Docs/heats/PLAN.md) | 3 |
 
 ## Order of work
 

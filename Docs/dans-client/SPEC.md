@@ -24,6 +24,7 @@ Read-only access to the DanS REST API, used by the control app main process.
 | `/events/{e}/officials/competitions` | Allocation: `{competition, person, role}`. |
 | `/events/{e}/startlist` | Competitors: `id`, `number`, `club`, `people.Persons[]` or couples. |
 | `/rounds/{r}/draw/competitors` | Heats: `competitors[]{id, number, dances[]{heat, completion}}`, dance order matches `round.dances` by `dance_order`. Verified read-only. |
+| `/rounds/{r}/marks` | Judges' marks of a round (heat tracking, D-29): crosses per competitor and dance, and `DanceCompletion` / `RoundCompletion` marks once a judge submits. Read in automatic mode for running rounds only; never shown on screen. Added 2026-11-22. |
 | `/index_age`, `/index_class`, `/index_discipline`, `/index_dance`, `/index_official_role` | Lookup names (`value`, `abbreviation`). |
 
 ## Values observed
