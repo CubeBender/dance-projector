@@ -88,3 +88,8 @@
 
 ## Separate header switches (2026-11-21)
 > Could you make it to have separate checker for judges and for competitors?
+
+## Hand-edited panels per round (2026-11-21)
+> After the second round, I can see the Competition 2 having a third round, but is sais no panel yet, but in order to have a round, there needs to be judge panel, am I right?
+>
+> yes, make it per round

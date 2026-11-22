@@ -46,6 +46,8 @@
 
 - 2026-11-21 **Judges straight from DanS** (D-25, C-43): Judge selection → From DanS has Fetch from DanS and a Competition list with judge counts. Checked against the venue DanS on CS1747: competitions 2 and 4 show their 9-judge panels.
 - 2026-11-21 **Optional header card** (C-44): Style tab checkboxes (judges and competitors separately, C-45) hide the competition card above Porota / Soutěžící.
+- 2026-11-21 **Follow running fix** (C-46): a hand-picked competition is no longer replaced by an already running one.
+- 2026-11-21 **Panels per round** (C-47): a hand edit or Clear no longer hides the DanS panel of the next round.
 
 ## In progress
 - Nothing running.

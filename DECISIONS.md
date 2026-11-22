@@ -295,3 +295,17 @@ Claude's decision log. Questions that need the user are asked in the conversatio
 - **Asked by the user:** one checkbox for the judges page and one for the competitors page instead of the shared one.
 - **Decision (Claude):** `theme.header` replaced by `headerJudges` and `headerCompetitors` (both default on). The competitor page reads `headerCompetitors`; every other page (judges, heats) reads `headerJudges`. A style saved with the old single `header` keeps its value for both.
 - **Checked:** in a test instance: an old `header: false` showed as both unticked; ticking judges only gave `true / false` in both draft states, the judges page drew its card, the competitor page's `header()` returned nothing. `npm test` passes.
+
+### C-46 Follow running reacts only to a competition that has just started (2026-11-21)
+- **Reported by the user:** in Judge selection the side stayed on competition 2 whatever was picked.
+- **Cause:** side A had Follow running on and competition 2's round was InProgress. Follow checked all running competitions on every rebuild, so a hand-picked competition that was not running was replaced straight back.
+- **Decision (Claude):** follow only acts on competitions that started running since the last rebuild (all running ones after an event change or app start). A hand-picked competition stays until another competition starts.
+- **Checked:** against the venue DanS with competition 2 running: after the first fetch, follow chose 2; picking 4 stayed on 4, also after another fetch. `npm test` passes.
+
+### C-47 Hand-edited panels are kept per round (2026-11-21, changes C-20)
+- **Reported by the user:** competition 2 showed "no panel yet" for its 3rd round although DanS had drawn 9 judges.
+- **Cause:** Clear had been pressed on competition 2 earlier; the empty hand-picked panel was stored per competition, so it hid the DanS panel of every later round. DanS also drew a slightly different panel for round 3.
+- **Asked by the user:** make the hand-edited panel per round.
+- **Decision (Claude):** overrides in `panels.json` are keyed `round:<round id>` (the competition id only while a competition has no round). Old competition-keyed entries therefore apply only to competitions without rounds. Use DanS panel / Clear / clicking a judge act on the competition's current round.
+- **Checked:** `npm test` (new asserts: old and other-round keys leave the DanS panel alone). In a test instance against the venue DanS: competition 2 round 3 showed its 9 DanS judges; removing one stored an 8-judge override under the round key and showed "differs from DanS (+0 / −1)".
+

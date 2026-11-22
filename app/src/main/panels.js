@@ -3,8 +3,9 @@
 //
 // DanS draws the judges for each competition shortly before it starts. The operator can either use that
 // allocation as read from DanS, or pick the panel by hand (manual mode, or to correct a panel before pushing).
-// A hand-picked panel is an "override": a list of DanS person ids stored per event and competition in
-// panels.json. While an override exists it wins over the DanS data; "Use DanS panel" deletes it again.
+// A hand-picked panel is an "override": a list of DanS person ids stored per event and ROUND in panels.json
+// (C-47; see panelKey). DanS draws the judges again for every round, so an edit of round 2 must not hide the
+// panel DanS drew for round 3. While an override exists it wins over the DanS data; "Use DanS panel" deletes it again.
 //
 // Everything here is pure (no files, no Electron) so it can be tested from plain Node.
 
@@ -18,11 +19,16 @@ const byLetter = (a, b) => a.letter.localeCompare(b.letter, 'cs');
 //   panelSource 'none'   – no panel yet
 // dansJudges keeps the DanS list so the window can show both and offer "Use DanS panel".
 // The model is changed in place and also returned.
+// Key of a competition's override in panels.json: its current round ("round:<id>"), or the competition id while
+// it has no round yet. Overrides saved before C-47 were keyed by competition id only; they now apply only to a
+// competition without rounds, so an old edit can't hide a later round's DanS panel.
+const panelKey = (c) => (c?.round?.id ? `round:${c.round.id}` : c?.id);
+
 function applyPanels(model, overrides = {}) {
   if (!model) return model;
   for (const c of model.competitions) {
     c.dansJudges = c.judges;
-    const ids = overrides[c.id];
+    const ids = overrides[panelKey(c)];
     if (Array.isArray(ids)) {
       c.judges = ids.map((id) => model.judges.get(id)).filter(Boolean).sort(byLetter);
       c.panelSource = 'manual';
@@ -98,4 +104,4 @@ function moveInOrder(ids, fedId, delta) {
   return out;
 }
 
-module.exports = { applyPanels, togglePanel, cleanLetter, nextLetter, toggleManual, SORTS, sortJudges, moveInOrder };
+module.exports = { panelKey, applyPanels, togglePanel, cleanLetter, nextLetter, toggleManual, SORTS, sortJudges, moveInOrder };

@@ -27,7 +27,7 @@ const { buildModel } = require('./model');
 const { Store, normalizeServer } = require('./store');
 const { OutputServer } = require('./server');
 const { Projection, COMPETITOR_SECTIONS } = require('./projection');
-const { applyPanels, togglePanel, toggleManual, cleanLetter, SORTS, moveInOrder } = require('./panels');
+const { panelKey, applyPanels, togglePanel, toggleManual, cleanLetter, SORTS, moveInOrder } = require('./panels');
 const { cleanTheme, themeFor, themeKey, PRESETS } = require('./theme');
 const { outputState, judgeView, cleanCrop, slotJudges, competitorList, competitorState } = require('./view');
 const { sortForImport, mainPhoto } = require('./gallery');
@@ -273,9 +273,19 @@ async function connect() {
   publish();
 }
 
-// "Follow running": a slot with follow on takes over a newly running competition when its own isn't running.
+// "Follow running": a slot with follow on takes over a NEWLY running competition when its own isn't running.
+// Only competitions that started running since the last rebuild count. Before, every rebuild looked at all running
+// competitions, so a competition picked by hand (not running) was replaced straight back by the running one and
+// the operator could never choose anything else while a round was in progress (C-46).
+let followSeen = { eventId: undefined, running: new Set() }; // competitions already running at the last rebuild
 function applyFollow() {
   if (!model) return false;
+  // what is running now, and which of those were not running last time (all of them after an event change)
+  const running = new Set(model.competitions.filter((c) => c.running).map((c) => c.id));
+  const seen = followSeen.eventId === store.cfg.eventId ? followSeen.running : new Set();
+  const started = new Set([...running].filter((id) => !seen.has(id)));
+  followSeen = { eventId: store.cfg.eventId, running };
+  if (!started.size) return false;
   let changed = false;
   for (const key of store.cfg.split ? ['A', 'B'] : ['A']) {
     const s = store.cfg.slots[key];
@@ -283,7 +293,7 @@ function applyFollow() {
     const other = store.cfg.slots[key === 'A' ? 'B' : 'A'].competitionId;
     const mine = model.competitions.find((c) => c.id === s.competitionId);
     if (mine?.running) continue;
-    const cand = model.competitions.filter((c) => c.running && c.id !== other)
+    const cand = model.competitions.filter((c) => started.has(c.id) && c.id !== other)
       .sort((a, b) => String(b.round?.started || '').localeCompare(String(a.round?.started || '')) || a.number - b.number)[0];
     if (cand && cand.id !== s.competitionId) { s.competitionId = cand.id; changed = true; }
   }
@@ -505,12 +515,13 @@ function setupIpc() {
   const comp = (id) => model?.competitions.find((c) => c.id === id);
   ipcMain.handle('panel-toggle', (_e, compId, personId) => {
     const c = comp(compId); if (!c) return rendererState();
-    const current = store.panelOverrides(store.cfg.eventId)[compId];
-    store.setPanel(store.cfg.eventId, compId, togglePanel(current, c.dansJudges.map((j) => j.personId), personId));
+    const current = store.panelOverrides(store.cfg.eventId)[panelKey(c)];
+    store.setPanel(store.cfg.eventId, panelKey(c), togglePanel(current, c.dansJudges.map((j) => j.personId), personId));
     rebuild(); return rendererState();
   });
-  ipcMain.handle('panel-reset', (_e, compId) => { store.setPanel(store.cfg.eventId, compId, null); rebuild(); return rendererState(); });
-  ipcMain.handle('panel-clear', (_e, compId) => { store.setPanel(store.cfg.eventId, compId, []); rebuild(); return rendererState(); });
+  // the window names the competition; the override belongs to its current round (panelKey, C-47)
+  ipcMain.handle('panel-reset', (_e, compId) => { const c = comp(compId); if (c) store.setPanel(store.cfg.eventId, panelKey(c), null); rebuild(); return rendererState(); });
+  ipcMain.handle('panel-clear', (_e, compId) => { const c = comp(compId); if (c) store.setPanel(store.cfg.eventId, panelKey(c), []); rebuild(); return rendererState(); });
 
   // ---- own selections without DanS (D-19, view.js manualCompetition) ----
   const manual = (slot) => (store.cfg.manualPanels[slot] ||= { judges: [] });

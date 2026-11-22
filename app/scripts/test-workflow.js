@@ -5,7 +5,7 @@
 const assert = require('assert');
 const fs = require('fs'); const os = require('os'); const path = require('path'); const http = require('http');
 const { buildModel } = require('../src/main/model');
-const { applyPanels, togglePanel } = require('../src/main/panels');
+const { panelKey, applyPanels, togglePanel } = require('../src/main/panels');
 const { cleanTheme, themeFor, DEFAULT_THEME } = require('../src/main/theme');
 const { Projection } = require('../src/main/projection');
 const { OutputServer } = require('../src/main/server');
@@ -34,7 +34,7 @@ const anyOther = [...m.judges.keys()].find((id) => !dansIds.includes(id));
 const edited = togglePanel(undefined, dansIds, dansIds[0]);
 assert.deepStrictEqual(edited, dansIds.slice(1));
 assert.deepStrictEqual(togglePanel(edited, dansIds, anyOther), [...dansIds.slice(1), anyOther]);
-applyPanels(m, { [c1.id]: [...edited, anyOther] });
+applyPanels(m, { [panelKey(c1)]: [...edited, anyOther] });
 assert.strictEqual(c1.panelSource, 'manual');
 assert.strictEqual(c1.judges.length, 7);
 assert.ok(c1.judges.some((j) => j.personId === anyOther));
@@ -43,6 +43,14 @@ const letters = c1.judges.map((j) => j.letter);
 assert.deepStrictEqual(letters, [...letters].sort((a, b) => a.localeCompare(b, 'cs')), 'sorted by letter');
 const m2 = applyPanels(buildModel(raw), {});
 assert.strictEqual(m2.competitions.find((c) => c.number === 1).panelSource, 'dans');
+// overrides are per round (C-47): an old competition-keyed one or another round's one leaves the DanS panel alone
+assert.ok(c1.round, 'fixture competition 1 has a round');
+assert.strictEqual(panelKey(c1), `round:${c1.round.id}`);
+const m3 = applyPanels(buildModel(raw), { [c1.id]: [], 'round:some-earlier-round': [] });
+assert.strictEqual(m3.competitions.find((c) => c.number === 1).panelSource, 'dans');
+assert.strictEqual(m3.competitions.find((c) => c.number === 1).judges.length, 7);
+// a competition without rounds still uses its own id
+assert.strictEqual(panelKey({ id: 'c9', round: null }), 'c9');
 
 // ---- store: panels, offline copy, cleanup that spares what is on screen ----
 const store = new Store(dir);
