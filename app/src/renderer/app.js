@@ -5,6 +5,9 @@ const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 let S = null;
 let filter = 'all', jfilter = 'all', search = '', jsearch = ''; // list filters of the Competitions and Judges tabs
+// Order of the Competitions tab: 'number' or 'checkin'. Kept in localStorage so it survives a restart; the storage
+// can be unavailable or empty, then it is simply 'number'.
+let sortBy = (() => { try { return localStorage.getItem('compSort') === 'checkin' ? 'checkin' : 'number'; } catch { return 'number'; } })();
 const DONE = new Set(['Completed', 'Closed', 'Cancelled', 'Finished']);
 
 function h(tag, attrs, ...kids) {
@@ -118,7 +121,13 @@ function renderComps() {
     const q = search.toLowerCase();
     list = list.filter((c) => String(c.number) === q || c.title.toLowerCase().includes(q) || c.titleShort.toLowerCase().includes(q));
   }
-  list.sort((a, b) => (b.running - a.running) || (a.number - b.number));
+  // Running competitions stay on top either way. 'checkin' orders the rest by check-in end (earliest first), because
+  // DanS numbers don't always follow the day's order; competitions without a check-in end go to the bottom.
+  // Ties (same time, or both without one) fall back to the number.
+  const byCheckIn = (a, b) => (a.checkInEnd || Infinity) - (b.checkInEnd || Infinity);
+  list.sort((a, b) => (b.running - a.running)
+    || (sortBy === 'checkin' ? byCheckIn(a, b) : 0)
+    || (a.number - b.number));
   $('#comps').replaceChildren(...list.map(compRow));
   const empty = $('#comps-empty');
   empty.hidden = list.length > 0;
@@ -713,6 +722,15 @@ $('#event').addEventListener('change', (e) => window.dp.setEvent(e.target.value 
 $('#refresh-events').addEventListener('click', () => window.dp.refreshEvents().then(apply));
 $('#search').addEventListener('input', (e) => { search = e.target.value.trim(); renderComps(); });
 $('#filter').addEventListener('click', (e) => { const b = e.target.closest('.chip'); if (!b) return; filter = b.dataset.f; $$('#filter .chip').forEach((x) => x.classList.toggle('active', x === b)); renderComps(); });
+// Sort chips: mark the chosen one, remember it, redraw
+const showSort = () => $$('#csort .chip').forEach((x) => x.classList.toggle('active', x.dataset.s === sortBy));
+showSort();
+$('#csort').addEventListener('click', (e) => {
+  const b = e.target.closest('.chip'); if (!b) return;
+  sortBy = b.dataset.s;
+  try { localStorage.setItem('compSort', sortBy); } catch { /* not remembered, still sorted for now */ }
+  showSort(); renderComps();
+});
 $('#jfilter').addEventListener('click', (e) => { const b = e.target.closest('.chip'); if (!b) return; jfilter = b.dataset.f; $$('#jfilter .chip').forEach((x) => x.classList.toggle('active', x === b)); renderJudges(); });
 $('#jsearch').addEventListener('input', (e) => { jsearch = e.target.value.trim(); renderJudges(); });
 // Import folder…: the main process opens the folder dialog, imports and returns a report

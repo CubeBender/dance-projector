@@ -47,6 +47,12 @@
         <button data-f="open" class="chip">Not finished</button>
       </div>
       <input id="search" placeholder="Find number or name" spellcheck="false">
+      <!-- order of the list; the choice is remembered (renderComps in app.js) -->
+      <div class="chips" id="csort">
+        <span class="sub">Sort by</span>
+        <button data-s="number" class="chip active">Number</button>
+        <button data-s="checkin" class="chip" title="Earliest check-in end first; competitions without a check-in time go last">Check-in end</button>
+      </div>
     </div>
     <div class="table-wrap"><table class="comps">
       <thead><tr><th class="slotcol">Show on</th><th>#</th><th>Competition</th><th>Check-in end</th><th>Round</th><th>Dances</th><th class="num">Checked in</th><th class="num">Judges</th></tr></thead>

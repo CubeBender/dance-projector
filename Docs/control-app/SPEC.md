@@ -13,6 +13,7 @@ Electron desktop app for the operator. Top bar, four tabs (Competitions, Judge p
 ## 2. Competitions
 - Table: number, title, state, check-in end, current round and dance, checked-in count.
 - Running competitions are highlighted and sorted to the top; a filter can hide finished ones.
+- Sort by number or by check-in end (earliest first, no time last); the choice is remembered.
 - Each row has two buttons, **A** and **B**, to put the competition on display slot A or B. Pressing an active button clears the slot.
 - Optional "follow running" per slot: the slot takes the running competition automatically when exactly one new one starts. Off by default.
 

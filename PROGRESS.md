@@ -48,6 +48,7 @@
 - 2026-11-21 **Optional header card** (C-44): Style tab checkboxes (judges and competitors separately, C-45) hide the competition card above Porota / Soutěžící.
 - 2026-11-21 **Follow running fix** (C-46): a hand-picked competition is no longer replaced by an already running one.
 - 2026-11-21 **Panels per round** (C-47): a hand edit or Clear no longer hides the DanS panel of the next round.
+- 2026-11-22 **Sorting in Competitions** (C-48): Sort by Number / Check-in end, remembered. Logic checked on the sample event; `npm test` passes. Not yet looked at in the app window.
 
 ## In progress
 - Nothing running.

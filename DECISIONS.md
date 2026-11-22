@@ -309,3 +309,7 @@ Claude's decision log. Questions that need the user are asked in the conversatio
 - **Decision (Claude):** overrides in `panels.json` are keyed `round:<round id>` (the competition id only while a competition has no round). Old competition-keyed entries therefore apply only to competitions without rounds. Use DanS panel / Clear / clicking a judge act on the competition's current round.
 - **Checked:** `npm test` (new asserts: old and other-round keys leave the DanS panel alone). In a test instance against the venue DanS: competition 2 round 3 showed its 9 DanS judges; removing one stored an 8-judge override under the round key and showed "differs from DanS (+0 / −1)".
 
+### C-48 Sorting of the Competitions tab (2026-11-22)
+- **Asked by the user:** sort the Competitions screen by check-in end, because the competition numbers are not always in the day's order.
+- **Decision (Claude):** two chips, Sort by *Number* (the old order, default) and *Check-in end* (earliest first). Running competitions stay on top in both, as before. Competitions without a check-in end go last; ties fall back to the number. The choice is kept in the window's localStorage (a per-window convenience, not app settings).
+- **Checked:** the sort on the sample event gives check-in order 08:15, 08:20, 08:25…; a competition without a time ends last. `npm test` passes.
