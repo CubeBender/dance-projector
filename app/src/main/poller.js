@@ -30,6 +30,7 @@ function slimEvent(ev) {
   return {
     id: eventIdOf(ev), name: ev.name, abbreviation: ev.abbreviation,
     location: ev.location, date: ev.date ?? ev.authorities?.[0]?.date, // ev may already be slim (offline copy)
+    days: ev.days ?? ev.authorities?.[0]?.days ?? 1, // how long the event lasts: competitor photos go after it (D-30)
   };
 }
 

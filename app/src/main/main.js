@@ -253,7 +253,7 @@ const mode = () => (fixtureFile ? 'auto' : store.cfg.mode); // a fixture always 
 async function loadEvents() {
   if (fixtureFile) { events = [{ ...raw.event, authorities: [{ event_id: raw.event.id, date: raw.event.date }] }]; return; }
   if (mode() === 'manual') { events = store.listSnapshots(); status = { connected: false, offline: true }; return; }
-  try { events = await dans.events(); if (!status.connected) status = { connected: true, error: null, lastOk: Date.now() }; }
+  try { events = await dans.events(); if (!status.connected) status = { connected: true, error: null, lastOk: Date.now() }; eventEnds(); }
   catch (e) { events = store.listSnapshots(); status = { connected: false, error: String(e.message || e) }; }
 }
 
@@ -478,6 +478,7 @@ function rendererState() {
       photos: c.photos.map((p) => ({ file: p.file, url: base ? `${base}/photos/${encodeURIComponent(p.file)}` : null, crop: cleanCrop(p.crop) })),
     })),
     competitorScreen: store.cfg.competitorScreen,
+    lastPurge,
     results: resultsWindowState(base),
     heats: heatsWindowState(),
     compProjection: compProjection ? { changes: compProjection.changes(), pushedAt: compProjection.pushedAt } : null,
@@ -744,6 +745,10 @@ function setupIpc() {
       allowed.language = { primary: p, secondary: s };
     }
     if ('split' in patch) allowed.split = !!patch.split;
+    if (patch.competitorKeepDays != null) {
+      const d = Math.round(Number(patch.competitorKeepDays));
+      if (d >= 1 && d <= 30) allowed.competitorKeepDays = d;
+    }
     if (Number(patch.pollMs) >= 500) { allowed.pollMs = Number(patch.pollMs); if (poller.intervalMs) poller.intervalMs = allowed.pollMs; }
     store.updateConfig(allowed); rebuild(); return rendererState();
   });
@@ -832,6 +837,53 @@ function setupIpc() {
 }
 
 // Removes photo and image files nothing uses, keeping whatever either projection still shows.
+// ---------------------------------------------------------------------------------------------------------
+// Competitor photos are not kept (D-30): children's photos go a few days after their event
+// ---------------------------------------------------------------------------------------------------------
+
+// When each event's last day ends (ms), from the DanS event list and the offline copies: date + days. The key is the
+// event id, as competitors.json uses it. Unknown events give null (then only the age of each photo counts).
+function eventEnds() {
+  const ends = new Map();
+  const add = (id, date, days) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(date || ''));
+    if (!id || !m) return;
+    // midnight after the last day, local time
+    const end = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + Math.max(1, Number(days) || 1)).getTime();
+    ends.set(id, Math.max(ends.get(id) || 0, end));
+  };
+  for (const e of store.listSnapshots()) add(e.id, e.date, e.days);
+  for (const e of events) add(eventIdOf(e), e.date ?? e.authorities?.[0]?.date, e.authorities?.[0]?.days);
+  // remembered from earlier runs: an event no longer listed (offline, or removed from DanS) still has its date
+  const known = { ...(store.cfg.eventEnds || {}) };
+  for (const [id, t] of Object.entries(known)) if (!ends.has(id)) ends.set(id, t);
+  // remember the events that have stored competitors, so their photos can go even once DanS no longer lists them
+  let changed = false;
+  for (const id of Object.keys(store.competitors.data)) {
+    if (ends.has(id) && known[id] !== ends.get(id)) { known[id] = ends.get(id); changed = true; }
+  }
+  if (changed) store.updateConfig({ eventEnds: known });
+  return ends;
+}
+
+// Deletes what Dance Projector collected about past events once it is older than the setting allows (D-30):
+// competitor photos and, after the event, everything typed about its competitors (C-57); the app's offline copies of
+// DanS data and its heat logs (C-58). Never DanS's own data. Photo files go with cleanupFiles(), except a photo still
+// on screen, which goes after the next push. Runs at start and every hour.
+let lastPurge = null; // { at, photos, competitors, offline, heatlogs } of the last run that removed something
+function purgeOldData() {
+  const ends = eventEnds();
+  const days = store.cfg.competitorKeepDays || 3;
+  const eventEnd = (k) => ends.get(k) ?? null;
+  const r = { ...store.purgeCompetitors({ days, eventEnd }), ...store.purgeCollected({ days, eventEnd, keepEvent: store.cfg.eventId }) };
+  if (Object.values(r).some(Boolean)) {
+    lastPurge = { at: Date.now(), ...r };
+    cleanupFiles();
+    if (r.offline && mode() === 'manual') loadEvents().then(publish); // Manual mode lists the offline copies
+    rebuild();
+  }
+}
+
 function cleanupFiles() {
   const keep = projection.referencedFiles();
   for (const f of compProjection?.referencedFiles() || []) keep.add(f);
@@ -1316,6 +1368,8 @@ async function start() {
   poller.on('status', (s) => { const changed = s.connected !== status.connected || s.error !== status.error; status = s; if (changed) publish(); else win?.webContents.send('status', s); });
 
   setupIpc();
+  purgeOldData();                                            // what the app collected about past events (D-30)
+  setInterval(purgeOldData, 3600 * 1000);
   win = new BrowserWindow({
     width: 1500, height: 940, minWidth: 1100, minHeight: 680, backgroundColor: '#0f1115', title: 'Dance Projector',
     webPreferences: { preload: path.join(__dirname, '..', 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },

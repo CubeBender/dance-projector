@@ -54,3 +54,8 @@ All images are re-encoded by Chromium (EXIF orientation applied, max 900 px wide
 - The competitor page shows the club (accent colour) and the sponsor (quieter) under the name, in the round grid and in spotlight. A long club shrinks to fit before it is cut.
 - The results page (D-26) shows both too.
 
+## Photos are not kept (2026-11-22, D-30, C-57)
+- A competitor photo is deleted N days (Settings, default 3) after the later of its event's last day and the moment it was added. Once an event is over by N days and none of its photos are left, everything typed about its competitors goes too.
+- Events whose date the app doesn't know keep everything; the app remembers event dates (`config.eventEnds`) once seen. Photos stored with no event chosen go by age.
+- Runs at start and every hour; a photo still on screen goes after the next push. Judge photos are never touched.
+- Since C-58, on the same schedule: the app's offline copy of the event's DanS data (`cache/<event>.json`, except the event chosen now) and its heat logs. DanS's own data is never touched.

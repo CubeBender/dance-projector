@@ -104,3 +104,15 @@
 > I will test it later. Now another helpful feature that I am not sure how to implement. We are also showing heats. Right now we broadcast it from Dans as a display that my colleague operates. The issue is, I am sometimes unsure what heat goes next. Is there an accurate way to understand which heat is dansing to know which one should be next?
 >
 > Ok, lets do it as suggested. I believe the crosses are live. But sometimes a judge can lagg behind or accidentally give a cross to somebody who is not dansing right now by selecting a wrong number. So there needs to be some margin of error to the current/ next heat logic.
+
+## Hosting club (2026-11-22)
+> Great! One edge case is hosting. That is a situation in which a competitors represents a different club than he or she is part of. If that happens, they give us a document confirming their hosting change and we change their club in Dans manually. Are you checking this data periodically, or do you fetch it once per event?
+
+## Dropdown closing (2026-11-22)
+> There is one problematic behaviour. After opening the competitions dropdown in Competitios tab, the dropdown keeps closing itself after a brief moment.
+
+## Competitor photos not kept (2026-11-22)
+> Another thing. Judges are adults, thus I can have them saved and their photos. Competitors are usually children so keeping their photos would be illadvised. Can we purge them after a few days? Like 3 days maybe.
+
+## Only our own data (2026-11-22)
+> Do not touch data that is not ours. If the DanS data was saved by DanS, then it is on DanS to delete them. If it is data from Dance Projector or Dance Projector has collected, then we can do it.

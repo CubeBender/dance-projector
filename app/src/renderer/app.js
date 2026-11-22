@@ -414,6 +414,14 @@ function renderSettings() {
   $('#lang-primary').value = S.config.language.primary;
   $('#lang-secondary').value = S.config.language.secondary;
   if (document.activeElement !== $('#running-states')) $('#running-states').value = S.config.runningStates.join(', ');
+  // D-30: how long competitor photos are kept, and what the last clean-up removed
+  if (document.activeElement !== $('#keep-days')) $('#keep-days').value = S.config.competitorKeepDays || 3;
+  const p = S.lastPurge;
+  $('#purge-note').hidden = !p;
+  const n = (k, one, many) => (p?.[k] ? `${p[k]} ${p[k] === 1 ? one : many}` : null);
+  if (p) $('#purge-note').textContent = `${new Date(p.at).toLocaleString()}: deleted `
+    + [n('photos', 'competitor photo', 'competitor photos'), n('competitors', 'competitor’s details', 'competitors’ details'),
+      n('offline', 'offline copy', 'offline copies'), n('heatlogs', 'heat log', 'heat logs')].filter(Boolean).join(', ') + ' of past events.';
 }
 
 // ---- Judges tab, top part: judge selection per side ----
@@ -784,6 +792,7 @@ $('#host').addEventListener('change', renderOutputs);
 $('#split').addEventListener('change', (e) => window.dp.setOption({ split: e.target.checked }).then(apply));
 $('#lang-primary').addEventListener('change', (e) => window.dp.setOption({ language: { primary: e.target.value, secondary: $('#lang-secondary').value } }).then(apply));
 $('#lang-secondary').addEventListener('change', (e) => window.dp.setOption({ language: { primary: $('#lang-primary').value, secondary: e.target.value } }).then(apply));
+$('#keep-days').addEventListener('change', (e) => window.dp.setOption({ competitorKeepDays: Number(e.target.value) }).then(apply));
 $('#running-states').addEventListener('change', (e) => window.dp.setOption({ runningStates: e.target.value.split(/[\s,]+/) }).then(apply));
 // Tabs: each button's data-tab names the section with id tab-<name>
 $$('.tab').forEach((t) => t.addEventListener('click', () => {

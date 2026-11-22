@@ -121,6 +121,13 @@ Claude's decision log. Questions that need the user are asked in the conversatio
 - **User:** "lets do it as suggested. I believe the crosses are live. But sometimes a judge can lagg behind or accidentally give a cross to somebody who is not dansing right now by selecting a wrong number. So there needs to be some margin of error to the current/ next heat logic."
 - **Decision:** new **Heats** tab and a line in the side-panel floor boxes. Following the marks with a quorum and forward-only movement, plus Next heat / Back by hand, and a heat log. See C-53 to C-55, [Docs/heats](Docs/heats/SPEC.md).
 
+### D-30 Competitor photos are deleted a few days after the event (2026-11-22)
+- **Asked by the user:** "Judges are adults, thus I can have them saved and their photos. Competitors are usually children so keeping their photos would be illadvised. Can we purge them after a few days? Like 3 days maybe."
+- **Decision:** competitor photos are deleted 3 days after their event (adjustable in Settings, 1–30 days); judge photos are kept. See C-57.
+- **Asked by Claude:** should the offline copies of DanS data (they hold the start lists with names) go after the same number of days?
+- **User:** "Do not touch data that is not ours. If the DanS data was saved by DanS, then it is on DanS to delete them. If it is data from Dance Projector or Dance Projector has collected, then we can do it."
+- **Decision:** everything Dance Projector wrote about an event goes on the same schedule: photos and typed details (C-57), the app's offline copies and its heat logs (C-58). DanS's own data is never touched (the app never reads or writes it).
+
 ## Claude's decisions
 
 ### C-01 Technology: Electron with plain JavaScript, no framework or build step
@@ -371,3 +378,16 @@ Claude's decision log. Questions that need the user are asked in the conversatio
 - **Cause:** every DanS read (every 2 s in automatic mode) pushes a new state to the window, which rebuilds its sections, including the dropdowns (competition pickers in Judges, Competitors and Results, the event list, the server list).
 - **Decision (Claude):** while a dropdown has focus, pushed states wait (the newest one is kept), and are applied when the dropdown loses focus, or after 20 s at the latest. Choosing an option takes the focus away at once, so the window catches up straight after a choice. The status line keeps updating, and answers to the operator's own actions are applied at once as before.
 - **Checked:** in a test copy in automatic mode against the venue DanS, a focused dropdown stayed the same element for 7 s while new states arrived, and after leaving it the window showed the newest data at once.
+
+### C-57 How competitor photos are purged (2026-11-22, D-30)
+- **Rule (Claude):** a photo is deleted N days (default 3) after the LATER of: the end of its event's last day (date + days from DanS), and the moment it was added. Photos collected a week early for an event stay until after it, and the two-day reuse by IDT (C-38) keeps working. Once an event is over by N days and none of its photos are left, everything typed about its competitors goes too (names, IDTs, club, sponsor). Children's data, and useless after the event.
+- **Unknown dates (Claude):** an event whose date the app doesn't know keeps everything, so photos collected early can't vanish just because DanS is out of reach. The app remembers the end of every event with stored competitors (`config.eventEnds`) whenever it sees the event, so the date stays known later. Photos stored with no event chosen go by their age alone.
+- **When:** at start and every hour. Files go through `cleanupFiles`, which keeps a photo that is still on screen until the next push. Settings shows when the last clean-up removed something.
+- **Not touched:** judge photos; the offline copies of DanS data (`cache/`, they hold the DanS start list); the heat log (start numbers only).
+- **Checked:** `test-purge.js`. On a copy of the real data: nothing deleted on 22 or 24 Nov. On 25 Nov the Saturday MČR photos (64) go, on 26 Nov the Sunday ones too (89 of 92). The 3 photos of an event without a known date stay.
+
+### C-58 The app's offline copies and heat logs go on the same schedule (2026-11-22, D-30)
+- **Decision (Claude):** `cache/<event>.json` (the app's copy of what it read from DanS) is deleted N days after its event's last day: the remembered end, or the date and days stored inside the copy. A copy without a date is kept. So is the copy of the event chosen now, because automatic mode would write it again straight away; it goes once another event is chosen. `heatlog/<day>.jsonl` goes N days after its day. Only `.json` files in `cache/` and dated logs are considered. Other files there, such as Chromium's own cache folders, are left alone.
+- **Not ours, never touched:** DanS's databases in `%APPDATA%\dans`, and anything else outside the app's data folder.
+- **Kept on purpose:** `pushed-competitors.json` (what the competitor screen shows now). It is replaced by the next push, and deleting it would change the screen.
+- **Checked:** `test-purge.js` (past copies gone; upcoming, undated, chosen and unreadable copies kept; old heat log gone, other files untouched). A dry run on a copy of the test data deleted nothing on 24 Nov, and on 26 Nov the CS1747 copy and the 22 Nov heat log.

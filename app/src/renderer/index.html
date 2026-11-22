@@ -107,7 +107,7 @@
       <span class="spacer"></span>
       <button id="comp-new">New competitor…</button>
     </div>
-    <p class="hint"><b>Ctrl+V</b> pastes a copied image (in WhatsApp Desktop: right-click the photo → Copy) to the selected competitor; with none selected it asks for the number. Click a card to select it. Image files can be dropped on any card.</p>
+    <p class="hint"><b>Ctrl+V</b> pastes a copied image (in WhatsApp Desktop: right-click the photo → Copy) to the selected competitor; with none selected it asks for the number. Click a card to select it. Image files can be dropped on any card. Competitor photos are deleted a few days after the event (Settings in the side panel); judge photos are kept.</p>
     <div class="ccards" id="clist"></div>
     <p class="empty" id="clist-empty" hidden></p>
   </section>
@@ -206,6 +206,12 @@
     </label>
 
     <h2>Settings</h2>
+    <!-- D-30: competitors are mostly children, their photos are not kept -->
+    <label class="stack">Delete event data after the event (days)
+      <input id="keep-days" type="number" min="1" max="30" step="1">
+      <small>What this app collected about an event – competitor photos (counted from when a photo was added, if that is later), what was typed about the competitors, the offline copy of its DanS data and the heat log – is deleted this many days after it. Judge photos are kept. DanS's own data is never touched.</small>
+    </label>
+    <p class="hint" id="purge-note" hidden></p>
     <label class="stack">Round states that count as running
       <input id="running-states" spellcheck="false">
       <small>DanS round state while judging is enabled. Default: InProgress</small>

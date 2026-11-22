@@ -55,6 +55,8 @@
 - 2026-11-22 **Heat now / next** (D-29, C-53 to C-55): Heats tab and a floor-box line; follows the judges' crosses (quorum of a third, forward only), finished and submitted dances, Next heat / Back; heat log + `scripts/heatlog.js`. Checked with tests and a live replay of yesterday's semifinal through a read-only simulator. Not yet seen on a real running round. [Docs/heats](Docs/heats/PLAN.md)
 - 2026-11-22 Poller keeps draws across polls (C-54): a round loaded with Load from DanS round no longer disappears in automatic mode.
 - 2026-11-22 Dropdowns no longer close by themselves in automatic mode (C-56): pushed updates wait while a dropdown is open.
+- 2026-11-22 **Competitor photos are not kept** (D-30, C-57): deleted 3 days after their event (adjustable in Settings), with the typed details; judges kept. Tested, and dry-run on a copy of the real data.
+- 2026-11-22 Offline copies and heat logs follow the same schedule (C-58); DanS's own data is never touched.
 
 ## In progress
 - Nothing running.

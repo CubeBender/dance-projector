@@ -72,3 +72,7 @@ flowchart LR
 
 - New **Heats** tab: for every running round, the heat on the floor now and the next one, with the start numbers, from the judges' marks (automatic mode) with a margin of error for lagging judges and wrong numbers, and **Next heat / Back** by hand. A short line in the side-panel floor boxes. For the operator only, nothing on screen.
 - Heat log for checking at an event. Details: [Docs/heats/SPEC.md](Docs/heats/SPEC.md).
+
+## Competitor photos are not kept (2026-11-22, decision D-30)
+
+- Competitor photos (mostly children) are deleted 3 days after their event (Settings: 1–30 days), together with everything typed about the competitors; judge photos are kept. Rule in C-57 and [Docs/competitors/SPEC.md](Docs/competitors/SPEC.md).

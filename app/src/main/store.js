@@ -43,6 +43,9 @@ const DEFAULT_CONFIG = {
   heatsShow: 'full', // 'full' (number, name, club) | 'names' (number, name) | 'numbers'
   // ---- competitors (D-22) ----
   competitorPort: 8788,  // the competitor projection has its own output server and port (C-32)
+  // Competitor photos (mostly children) are deleted this many days after their event, together with everything
+  // typed about the competitors (D-30, Store.purgeCompetitors). 1–30.
+  competitorKeepDays: 3,
   // What the competitor projection shows (C-36):
   //   competitionId  DanS competition the header comes from (null = typed header only)
   //   roundId/roundName  the DanS round the numbers were loaded from
@@ -198,6 +201,71 @@ class Store {
     if ((this.competitor(key)?.photos || []).some((p) => p.file === file)) this.updateCompetitor(key, { main: file });
   }
   setCompetitorCrop(key, file, crop) { this.updateCompetitor(key, withPhotoChange(this.competitor(key) || {}, file, { crop })); }
+  // Competitors are mostly children: their photos and what was typed about them are not kept (D-30). A photo goes
+  // `days` days after the LATER of (the day its event ends, the time it was added): photos collected a week before an
+  // event stay until after it, and day 1 of a two-day championship can still lend its photos to day 2 (C-38). Once an
+  // event is over by `days` days and none of its photos are left, everything stored about its competitors goes
+  // (typed names, IDTs, club, sponsor). Judges are adults and stay in their gallery; this never touches them.
+  //   eventEnd(eventKey) -> ms when the event's last day ends, or null when unknown. An event whose end is unknown
+  //   keeps everything (its photos may have been collected early for an event still to come); only photos stored
+  //   with no event chosen ('_none') go by their age alone.
+  // The files themselves are removed by cleanupFiles(), which keeps a photo while it is still on screen.
+  // Returns what was removed: { photos, competitors }.
+  purgeCompetitors({ days = 3, now = Date.now(), eventEnd = () => null } = {}) {
+    const keepFor = days * 24 * 3600 * 1000;
+    const added = (file) => Number(String(file).match(/-(\d{13})-/)?.[1] || 0); // copyIntoPhotos puts the time in the name
+    let photos = 0, competitors = 0;
+    for (const [eventKey, ev] of Object.entries(this.competitors.data)) {
+      const end = eventKey === '_none' ? null : eventEnd(eventKey);
+      if (end == null && eventKey !== '_none') continue;
+      const eventOver = end != null && now - end >= keepFor;
+      for (const [key, c] of Object.entries(ev)) {
+        const kept = (c.photos || []).filter((p) => now - Math.max(added(p.file), end || 0) < keepFor);
+        photos += (c.photos || []).length - kept.length;
+        if (eventOver && !kept.length) { delete ev[key]; competitors += 1; continue; }
+        if (kept.length !== (c.photos || []).length) {
+          ev[key] = { ...c, photos: kept, main: kept.some((p) => p.file === c.main) ? c.main : (kept[0]?.file || null) };
+          if (!kept.length) { delete ev[key].photos; delete ev[key].main; }
+        }
+      }
+      if (!Object.keys(ev).length) delete this.competitors.data[eventKey];
+    }
+    if (photos || competitors) this.competitors.save();
+    return { photos, competitors };
+  }
+
+  // The rest of what Dance Projector collected about an event goes on the same schedule (D-30, C-58):
+  //   cache/<event>.json   the app's offline copy of what it read from DanS (start lists with competitors' names);
+  //   heatlog/<day>.jsonl  the heat log (judges' marks with start numbers).
+  // Only files this app wrote. DanS's own data (its databases in %APPDATA%\dans) is DanS's to keep or delete; the app
+  // never reads or writes it. An offline copy goes N days after its event's last day (eventEnd, or the date inside
+  // the copy); one without a date is kept, and so is the copy of the event chosen now (keepEvent), which automatic
+  // mode would write again straight away. A heat log goes N days after its day. Returns { offline, heatlogs }.
+  purgeCollected({ days = 3, now = Date.now(), eventEnd = () => null, keepEvent = null } = {}) {
+    const keepFor = days * 24 * 3600 * 1000;
+    const dayEnd = (date, n = 1) => {
+      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(date || ''));
+      return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + Math.max(1, Number(n) || 1)).getTime() : null;
+    };
+    let offline = 0, heatlogs = 0;
+    for (const f of fs.readdirSync(this.cacheDir).filter((x) => x.endsWith('.json'))) {
+      const file = path.join(this.cacheDir, f);
+      let ev;
+      try { ev = JSON.parse(fs.readFileSync(file, 'utf8')).event; } catch { continue; } // broken or being written
+      if (!ev?.id || ev.id === keepEvent) continue;
+      const end = eventEnd(ev.id) ?? dayEnd(ev.date, ev.days);
+      if (end == null || now - end < keepFor) continue;
+      try { fs.rmSync(file, { force: true }); offline += 1; if (this.lastSnapshot) delete this.lastSnapshot[ev.id]; } catch { /* next time */ }
+    }
+    const logDir = path.join(this.dir, 'heatlog');
+    for (const f of fs.existsSync(logDir) ? fs.readdirSync(logDir) : []) {
+      const end = dayEnd(f);
+      if (end == null || now - end < keepFor) continue;
+      try { fs.rmSync(path.join(logDir, f), { force: true }); heatlogs += 1; } catch { /* next time */ }
+    }
+    return { offline, heatlogs };
+  }
+
   hasCompetitorPhotoHash(key, hash) { return !!(hash && (this.competitor(key)?.photos || []).some((p) => p.hash === hash)); }
 
   // ---- judge panels picked by the operator (see panels.js) ----
