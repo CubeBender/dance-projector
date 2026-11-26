@@ -1,0 +1,52 @@
+#!/bin/sh
+# Rebuilds the Windows app (app/dist, `npm run dist`) before every push that changes it, so the .exe on this PC
+# always matches what is on GitHub (C-60, DECISIONS.md). Enabled together with pre-commit by:
+#   git config core.hooksPath .githooks
+# Skip once:  git push --no-verify      (or SKIP_DIST=1 git push)
+#
+# If the build fails, the push is stopped, so a broken app never goes up without you noticing.
+
+exec 1>&2
+
+if [ -n "$SKIP_DIST" ]; then echo "pre-push: SKIP_DIST set, not building the .exe"; exit 0; fi
+
+zero=0000000000000000000000000000000000000000
+build=0
+
+# Git passes one line per pushed ref: <local ref> <local sha> <remote ref> <remote sha>.
+# Build only when the pushed commits touch what goes into the .exe; a docs-only push stays quick.
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue                 # deleting a remote branch: nothing to build
+  if [ "$remote_sha" = "$zero" ] || ! git cat-file -e "$remote_sha" 2>/dev/null; then
+    build=1                                              # new branch, or remote state unknown here: build to be safe
+  elif git diff --name-only "$remote_sha" "$local_sha" -- app/src app/package.json app/package-lock.json obs/pages | grep -q .; then
+    build=1
+  fi
+done
+
+if [ "$build" = 0 ]; then echo "pre-push: no app changes, .exe not rebuilt"; exit 0; fi
+
+root=$(git rev-parse --show-toplevel)
+
+# The build replaces app/dist/win-unpacked; Windows won't let it while the app is running from there.
+# Only copies started from app\dist count: an installed copy (elsewhere) doesn't lock anything.
+running=$(powershell -NoProfile -Command "(Get-Process -Name 'Dance Projector' -ErrorAction SilentlyContinue | Where-Object { \$_.Path -like '*\\app\\dist\\*' }).Count" 2>/dev/null | tr -d '\r')
+if [ -n "$running" ] && [ "$running" != 0 ]; then
+  echo "pre-push: Dance Projector.exe is running from app\\dist. Close it and push again (or: git push --no-verify)."
+  exit 1
+fi
+
+# The build takes the files on disk, not the commits. Say so when they differ, so a test change isn't shipped unnoticed.
+if [ -n "$(git -C "$root" status --porcelain -- app/src app/package.json obs/pages)" ]; then
+  echo "pre-push: note - uncommitted changes in app/src, app/package.json or obs/pages go into this build too."
+fi
+
+echo "pre-push: building the .exe (npm run dist, about 1-2 minutes)..."
+if ! (cd "$root/app" && npm run dist > dist-build.log 2>&1); then
+  echo "pre-push: the build FAILED, push stopped. Last lines of app/dist-build.log:"
+  tail -n 20 "$root/app/dist-build.log" | sed 's/^/  /'
+  exit 1
+fi
+rm -f "$root/app/dist-build.log"
+echo "pre-push: built app/dist/$(cd "$root/app/dist" && ls -t *Setup*.exe | head -n 1)"
+exit 0

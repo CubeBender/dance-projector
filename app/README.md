@@ -14,6 +14,25 @@ npm test             # model, safety and storage tests
 
 Options: `--data=<folder>` uses a separate settings folder, `--devtools` opens the developer tools.
 
+## Build the .exe
+
+```
+cd app
+npm run dist         # dist/Dance Projector Setup <version>.exe (installer) + dist/win-unpacked/
+npm run dist:dir     # only dist/win-unpacked/Dance Projector.exe, no installer (quicker)
+```
+
+The installer is per user (no admin rights), lets you pick the folder, and adds a desktop and Start menu shortcut.
+`dist/win-unpacked/Dance Projector.exe` also runs straight from that folder without installing. The .exe uses the
+same data folder as `npm start` (`%APPDATA%\dance-projector`), so settings, gallery and offline copies carry over.
+It carries a copy of `obs/pages` for the background in the app's preview; OBS itself keeps reading `obs/pages`
+from the project. The build is a snapshot: after changing the code, run `npm run dist` again and reinstall.
+It is not code-signed, so Windows SmartScreen asks once: More info → Run anyway.
+
+`git push` rebuilds it automatically when the pushed commits change the app (`.githooks/pre-push`, enabled with
+`git config core.hooksPath .githooks`). A failed build stops the push. Close the app if it runs from `app\dist`
+first. Skip once with `git push --no-verify` or `SKIP_DIST=1 git push`.
+
 ## Use
 
 1. Type the DanS server address (for example `http://192.168.1.80`) and press **Connect**. **Save…** keeps it under a name.

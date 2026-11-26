@@ -58,6 +58,9 @@
 - 2026-11-22 **Competitor photos are not kept** (D-30, C-57): deleted 3 days after their event (adjustable in Settings), with the typed details; judges kept. Tested, and dry-run on a copy of the real data.
 - 2026-11-22 Offline copies and heat logs follow the same schedule (C-58); DanS's own data is never touched.
 
+- 2026-11-26 **Windows .exe** (C-59): `npm run dist` in `app/` builds `Dance Projector Setup 0.1.0.exe` (per-user installer with shortcuts) and `dist/win-unpacked/Dance Projector.exe`; same data folder as `npm start`. Smoke-tested: servers, brand pages, OCR.
+- 2026-11-26 Pre-push hook rebuilds the .exe whenever a push changes the app (C-60).
+
 ## In progress
 - Nothing running.
 

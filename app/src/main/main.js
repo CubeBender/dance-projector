@@ -41,7 +41,14 @@ const csts = require('./csts');
 // separate settings folder (handy for testing next to the real instance).
 const arg = (name) => { const a = process.argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : null; };
 const fixtureFile = arg('fixture');
-if (arg('data')) app.setPath('userData', path.resolve(arg('data')));
+// The data folder is always %APPDATA%\dance-projector, whether the app runs from `npm start` or as the built
+// Dance Projector.exe (C-59). Electron would otherwise name the folder after the product name of the build
+// ("Dance Projector") and the .exe would start with empty settings, no gallery and no offline copies.
+app.setPath('userData', arg('data') ? path.resolve(arg('data')) : path.join(app.getPath('appData'), 'dance-projector'));
+
+// Where the OBS brand pages (obs/pages) are, for the background in the app's preview. From the project they sit
+// next to app/; the built .exe carries its own copy in resources/brand (see "extraResources" in package.json).
+const BRAND_DIR = app.isPackaged ? path.join(process.resourcesPath, 'brand') : path.join(__dirname, '..', '..', '..', 'obs', 'pages');
 
 let win, store, poller, server, dans, projection;
 let compServer = null, compProjection = null, compAddr = null; // competitor projection (C-32)
@@ -1329,7 +1336,7 @@ async function start() {
     outputsDir: path.join(__dirname, '..', 'outputs'),
     photoDir: store.photoDir,
     mediaDir: store.mediaDir,
-    brandDir: path.join(__dirname, '..', '..', '..', 'obs', 'pages'), // for the background in the app's preview
+    brandDir: BRAND_DIR, // for the background in the app's preview
   });
   // The projection starts with whatever was pushed last time, so a restart doesn't change the screen.
   projection = new Projection({ server, file: path.join(store.dir, 'pushed.json') });
@@ -1339,7 +1346,7 @@ async function start() {
     outputsDir: path.join(__dirname, '..', 'outputs'),
     photoDir: store.photoDir,
     mediaDir: store.mediaDir,
-    brandDir: path.join(__dirname, '..', '..', '..', 'obs', 'pages'),
+    brandDir: BRAND_DIR,
     upload: phoneUpload,
   });
   compProjection = new Projection({ server: compServer, file: path.join(store.dir, 'pushed-competitors.json'), sections: COMPETITOR_SECTIONS });

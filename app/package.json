@@ -10,14 +10,49 @@
     "snapshot": "node scripts/snapshot.js",
     "anonymize": "node scripts/anonymize-fixture.js",
     "test": "node scripts/test-model.js && node scripts/test-store.js && node scripts/test-workflow.js && node scripts/test-gallery.js && node scripts/test-competitors.js && node scripts/test-printout.js && node scripts/test-results.js && node scripts/test-heats.js && node scripts/test-purge.js",
-    "preview": "node scripts/preview-server.js"
+    "preview": "node scripts/preview-server.js",
+    "dist": "electron-builder --win",
+    "dist:dir": "electron-builder --win --dir"
   },
   "devDependencies": {
-    "electron": "^44.8.0"
+    "electron": "^44.8.0",
+    "electron-builder": "^26.18.0"
   },
   "dependencies": {
     "@tesseract.js-data/ces": "1.0.0",
     "qrcode": "1.5.4",
     "tesseract.js": "7.0.0"
+  },
+  "build": {
+    "appId": "cz.danceprojector.app",
+    "productName": "Dance Projector",
+    "directories": {
+      "output": "dist"
+    },
+    "asar": false,
+    "files": [
+      "src/**/*",
+      "package.json",
+      "!**/*.map"
+    ],
+    "extraResources": [
+      {
+        "from": "../obs/pages",
+        "to": "brand"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Dance Projector"
+    }
   }
 }

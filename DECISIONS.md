@@ -391,3 +391,19 @@ Claude's decision log. Questions that need the user are asked in the conversatio
 - **Not ours, never touched:** DanS's databases in `%APPDATA%\dans`, and anything else outside the app's data folder.
 - **Kept on purpose:** `pushed-competitors.json` (what the competitor screen shows now). It is replaced by the next push, and deleting it would change the screen.
 - **Checked:** `test-purge.js` (past copies gone; upcoming, undated, chosen and unreadable copies kept; old heat log gone, other files untouched). A dry run on a copy of the test data deleted nothing on 24 Nov, and on 26 Nov the CS1747 copy and the 22 Nov heat log.
+
+### C-59 Windows .exe built with electron-builder (2026-11-26)
+- **Asked by the user:** launch the app from an .exe instead of `npm start`.
+- **Decision (Claude):** electron-builder, NSIS installer per user (no admin, folder can be chosen, desktop + Start menu shortcut), `npm run dist`; `npm run dist:dir` gives just the unpacked folder. Output in `app/dist/` (git-ignored).
+- **Data folder pinned:** the main process sets `userData` to `%APPDATA%\dance-projector` explicitly (unless `--data`). With the product name "Dance Projector" Electron would otherwise use a different folder and the .exe would start empty.
+- **No asar:** tesseract.js starts its OCR engine as a worker thread from a file in `node_modules`, which can't run from inside an asar archive. The app is shipped as plain files (~430 MB unpacked, 138 MB installer).
+- **Brand pages:** the preview background came from `../../../obs/pages`, outside the app. The build copies `obs/pages` into `resources/brand` and the packaged app reads it there.
+- **Not done:** no code signing (SmartScreen warns once), no custom icon, no auto-update.
+- **Checked:** the packaged exe with a scratch data folder served `/out/` (8787), `/out/competitors.html` (8788) and `/brand/brand.css`; the OCR engine with the Czech data ran from the packaged files.
+
+### C-60 The .exe is rebuilt on every push (2026-11-26, extends C-59)
+- **Asked by the user:** `npm run dist` should run automatically with a push to GitHub.
+- **Question (Claude → user):** build on this PC (git pre-push hook), on GitHub (Actions + public Release), or both? **User's answer:** on this PC.
+- **Decision (Claude):** `.githooks/pre-push`, enabled by the same `git config core.hooksPath .githooks` as the pre-commit hook. It builds only when the pushed commits change `app/src`, `app/package.json`, `app/package-lock.json` or `obs/pages`; other pushes stay instant. A failed build stops the push (log in `app/dist-build.log`). If the app runs from `app\dist` (which locks the files), the push stops with a message to close it; an installed copy elsewhere doesn't count. The build takes the files on disk, so the hook warns when the app has uncommitted changes. Skip once with `git push --no-verify` or `SKIP_DIST=1 git push`.
+- **Checked:** simulated pushes: no app change → no build; app change → built in 45 s; app running from dist → push stopped; SKIP_DIST → skipped.
+
